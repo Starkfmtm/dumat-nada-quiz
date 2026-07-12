@@ -7,7 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Montserrat:wght@400;500;700;900&display=swap" rel="stylesheet">
-<!-- Использование стабильной библиотеки MQTT over WebSockets вместо PeerJS -->
+<!-- Использование стабильной библиотеки MQTT over WebSockets -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
 <style>
 body{font-family:'Montserrat',sans-serif;background-color:#080313;background-image:radial-gradient(circle at 50% 50%,#170732 0%,#080313 100%);}
@@ -308,16 +308,16 @@ const ROUND_DETAILS = {
   1:{name:"Классика (Разминка)",rules:"Каждый игрок по очереди отвечает на свой вопрос. Легкая эрудиция. Верно: +1. Штрафа нет."},
   2:{name:"Слепой выбор",rules:"Игрок выбирает тему из списка. Ценность вопроса (1, 2 или 3 балла) определяется случайно ПОСЛЕ выбора темы. Штрафа нет."},
   3:{name:"По порядку",rules:"Нужно расставить 4 варианта в верном порядке (нажимайте по очереди). Верно: +2. Ошибка: 0."},
-  4:{name:"Минное поле",rules:"4 варианты: 1 верный (+2), 2 нейтральных (0) и 1 МИНА (-2). Будьте осторожны."},
+  4:{name:"Минное поле",rules:"4 варианта: 1 верный (+2), 2 нейтральных (0) и 1 МИНА (-2). Выбирайте варианты один за другим, пока не откроете все нейтральные, верный ответ или мину!"},
   5:{name:"Король горы",rules:"Вопрос — только для текущего лидера. Верно: лидер +1. Ошибка: лидер −1, все остальные +1."},
   6:{name:"Злой Квиз",rules:"Отвечаете по очереди. Верный ответ — заберите 1 балл у любого соперника. Ошибка никого не наказывает."},
   7:{name:"Блиц-контроль",rules:"45 секунд на игрока, вопросы без вариантов, ведущий сам судит устные ответы. +1 балл за каждые 2 верных."},
   8:{name:"Черный ящик",rules:"Ведущий читает подсказки по одной (4 шт., сложность убывает). Ответ после 1-й: +4, 2-й: +3, 3-й: +2, 4-й: +1. Ошибка — 0 и выход."},
   9:{name:"Своя игра (Аукцион)",rules:"Игроки делают ставки своими баллами. Победитель торгов отвечает на вопрос: верно +ставка, ошибка −ставка."},
   10:{name:"Снежный ком",rules:"Цепочка из 3 вопросов возрастающей сложности. 1-й: +1 (можно забрать), 2-й: +2, 3-й: +3. Ошибка обнуляет всё за текущий раунд."},
-  11:{name:"Карусель",rules:"Игроки отвечают по кругу. Верный ответ добавляет +1 в общий банк. Ошибка прерывает круг — банк забирает последний ответивший верно."},
+  11:{name:"Карусель",rules:"Игроки отвечают по кругу. Верный ответ добавляет +0.5 в общий банк. Ошибка прерывает круг — банк забирает последний ответивший верно."},
   12:{name:"Последний выживший",rules:"Быстрые устные вопросы, 5 секунд на ответ. Ошибка/тайм-аут — выбывание. Победитель получает +3."},
-  13:{name:"Раунд Союза",rules:"Один сложный вопрос на всех. Отвечает вся команда сообща. Верно: +1 каждому. Неверно: −2 каждому."},
+  13:{name:"Раунд Союза",rules:"Один сложный вопрос на всех. Отвечает вся команда. Итоговое решение команды определяется большинством голосов. Верно: +1 каждому. Неверно: −2 каждому."},
   14:{name:"Финальный спринт",rules:"Хардкорные вопросы. Верно: +2. Штрафа нет."},
   15:{name:"Вето и Ва-банк",rules:"8 категорий. По очереди вычеркиваете (вето) лишние, затем выбираете тему и делаете скрытую ставку (до ва-банка). Верно: +ставка, ошибка: −ставка."}
 };
@@ -391,7 +391,6 @@ function initHostLobby(){
 
   roomTopic = `dumat_quiz_v2/${rawCode}`;
 
-  /* Безопасное WebSockets подключение через глобальное публичное облако */
   mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
     clientId: 'dumat_host_' + Math.random().toString(16).substring(2, 10),
     keepalive: 30
@@ -435,7 +434,6 @@ function joinAsPlayer(){
   });
 
   mqttClient.on('connect', () => {
-    /* Подписка на персональный канал игрока и общий канал трансляции */
     mqttClient.subscribe(`${roomTopic}/broadcast`);
     mqttClient.subscribe(`${roomTopic}/player/${encodeURIComponent(name)}`);
 
@@ -521,6 +519,18 @@ function handleIncomingHostData(data){
       feedbackOverlay.classList.add('flex', data.feedback.isCorrect?'bg-emerald-900':'bg-red-950','animate__fadeIn');
       document.getElementById('player-feedback-icon').innerText=data.feedback.isCorrect?"✅":"❌";
       document.getElementById('player-feedback-title').innerText=(data.feedback.isCorrect?"ВЕРНО!":"ОШИБКА!");
+      
+      let pFeedbackSub = document.getElementById('player-feedback-sub');
+      if (!pFeedbackSub) {
+        pFeedbackSub = document.createElement('p');
+        pFeedbackSub.id = 'player-feedback-sub';
+        pFeedbackSub.className = 'text-xs text-zinc-200 mt-2 font-bold';
+        feedbackOverlay.appendChild(pFeedbackSub);
+      }
+      let subHtml = "";
+      if (data.feedback.choiceText) subHtml += `Ваш выбор: ${data.feedback.choiceText}<br>`;
+      if (data.feedback.correctText) subHtml += `Правильно: ${data.feedback.correctText}`;
+      pFeedbackSub.innerHTML = subHtml;
     } else {
       feedbackOverlay.classList.add('hidden');
       feedbackOverlay.classList.remove('flex', 'bg-emerald-900', 'bg-red-950', 'animate__fadeIn');
@@ -754,6 +764,8 @@ function renderPlayerPlayStage(data){
 function renderPlayerMC(data, everyoneCanAnswer, iAmActive){
   const active = everyoneCanAnswer ? true : iAmActive;
   const hasAnswered = data.hasAnswered || [];
+  const type = data.roundType;
+  const rt = data.rt || {};
 
   if(active && !hasAnswered.includes(clientState.name)){
     showControllerStage('player-ctrl-abcd');
@@ -767,10 +779,20 @@ function renderPlayerMC(data, everyoneCanAnswer, iAmActive){
       bGrid.innerHTML='';
       (data.options||[]).forEach((opt,idx)=>{
         const btn=document.createElement('button');
-        btn.className=`w-full text-left font-bold py-4 px-5 rounded-2xl border-b-4 transition-all text-xs flex items-center gap-3 animate__animated animate__fadeInUp ${idx===0?'bg-pink-600 active:bg-pink-500 text-white border-pink-900':idx===1?'bg-cyan-500 active:bg-cyan-400 text-black border-cyan-800':idx===2?'bg-yellow-400 active:bg-yellow-300 text-black border-yellow-700':'bg-indigo-600 active:bg-indigo-500 text-white border-indigo-900'}`;
-        btn.style.animationDelay = `${idx * 0.1}s`;
-        btn.innerHTML=`<span class="bg-black/20 px-2 py-0.5 rounded text-[10px] font-black">${String.fromCharCode(1040+idx)}</span> <span class="flex-grow text-left">${opt}</span>`;
-        btn.onclick=()=>submitPlayerChoice(idx);
+        
+        // Логика Минного поля (Раунд 4) для смартфона игрока
+        const isClicked = type === 'mine' && rt.clickedOpts && rt.clickedOpts.includes(idx);
+        
+        if (type === 'mine' && isClicked) {
+          btn.className = `w-full text-left font-bold py-4 px-5 rounded-2xl border-b-4 transition-all text-xs flex items-center gap-3 bg-zinc-800 text-zinc-500 border-zinc-950 opacity-40 cursor-not-allowed`;
+          btn.disabled = true;
+          btn.innerHTML = `<span class="bg-black/20 px-2 py-0.5 rounded text-[10px]">⚪</span> <span class="flex-grow text-left line-through">${opt} (Пусто)</span>`;
+        } else {
+          btn.className=`w-full text-left font-bold py-4 px-5 rounded-2xl border-b-4 transition-all text-xs flex items-center gap-3 animate__animated animate__fadeInUp ${idx===0?'bg-pink-600 active:bg-pink-500 text-white border-pink-900':idx===1?'bg-cyan-500 active:bg-cyan-400 text-black border-cyan-800':idx===2?'bg-yellow-400 active:bg-yellow-300 text-black border-yellow-700':'bg-indigo-600 active:bg-indigo-500 text-white border-indigo-900'}`;
+          btn.style.animationDelay = `${idx * 0.1}s`;
+          btn.innerHTML=`<span class="bg-black/20 px-2 py-0.5 rounded text-[10px] font-black">${String.fromCharCode(1040+idx)}</span> <span class="flex-grow text-left">${opt}</span>`;
+          btn.onclick=()=>submitPlayerChoice(idx);
+        }
         bGrid.appendChild(btn);
       });
     } else {
@@ -910,6 +932,10 @@ function initRoundRuntime(){
   const type=roundType(hostState.currentRound);
   const rq=hostState.roundQuestions;
   hostState.rt={};
+  
+  if(type==='mine'){
+    hostState.rt.clickedOpts = [];
+  }
   if(type==='blind'){
     hostState.rt.stage='choose_category';
     const qs = rq.questions || [];
@@ -923,7 +949,7 @@ function initRoundRuntime(){
   if(type==='survivor'){ hostState.players.forEach(p=>p.alive=true); hostState.rt.aliveCount=hostState.players.length; }
   if(type==='blackbox'){ hostState.rt.clueIdx=0; hostState.rt.buzzed=false; }
   if(type==='auction'){ hostState.rt.stage='bidding'; hostState.rt.bids={}; }
-  if(type==='snowball'){ hostState.rt.chainIdx=0; hostState.rt.bankedPoints=0; hostState.rt.awaitingDecision=false; }
+  if(type==='snowball'){ hostState.rt.chainIdx=0; hostState.rt.bankedPoints=0; hostState.rt.awaitingDecision=false; hostState.rt.chainDone=false; }
   if(type==='veto'){
     const cats=rq.categories||[];
     hostState.rt.phase='veto';
@@ -960,7 +986,7 @@ function runRevealThemeTransition(){
 function beginRoundPlayPhase(){
   const type=roundType(hostState.currentRound);
   if(type==='auction'){ hostState.roundStage='play'; hostState.rt.stage='bidding'; broadcastStateToPlayers(); updateHostUI(); return; }
-  if(type==='union'){ hostState.roundStage='play'; hostState.showOptions=true; broadcastStateToPlayers(); updateHostUI(); return; }
+  if(type==='union'){ hostState.roundStage='play'; hostState.showOptions=true; startOralTimer(30); broadcastStateToPlayers(); updateHostUI(); return; }
   if(type==='veto'){ hostState.roundStage='play'; broadcastStateToPlayers(); updateHostUI(); return; }
   runPlayerAnnouncement();
 }
@@ -982,6 +1008,17 @@ function runPlayerAnnouncement(){
 
   const type=roundType(hostState.currentRound);
   const announceDelay = (type === 'survivor') ? 1200 : 2500;
+
+  // Очистка состояния перед стартом хода нового игрока в Снежном коме (Раунд 10)
+  if (type === 'snowball') {
+    hostState.rt.chainIdx = 0;
+    hostState.rt.bankedPoints = 0;
+    hostState.rt.awaitingDecision = false;
+    hostState.rt.chainDone = false;
+  }
+  if (type === 'mine') {
+    hostState.rt.clickedOpts = [];
+  }
 
   document.getElementById('tv-player-announcement-stage').classList.remove('hidden');
   document.getElementById('tv-player-announcement-name').innerText=activePlayer.name.toUpperCase();
@@ -1014,8 +1051,32 @@ function startOralTimer(seconds){
       const type = roundType(hostState.currentRound);
       if(type==='survivor') survivorJudge(false);
       if(type==='oral') oralFinishTurn();
+      if(type==='union') resolveUnionTimeout();
     }
   },1000);
+}
+
+// Завершение по времени для Раунда 13 (Союз)
+function resolveUnionTimeout() {
+  const qData=hostState.roundQuestions.questions[0];
+  const votes = [0, 0, 0, 0];
+  let hasVotes = false;
+  Object.values(hostState.answersReceived).forEach(choice => {
+    votes[choice] = (votes[choice] || 0) + 1;
+    hasVotes = true;
+  });
+  
+  let isCorrect = false;
+  let majorityChoice = 0;
+  if (hasVotes) {
+    majorityChoice = votes.indexOf(Math.max(...votes));
+    isCorrect = majorityChoice === qData.c;
+  }
+  
+  hostState.players.forEach(p=>changeScore(p, isCorrect?1:-2));
+  logHostEvent(`Время Союза истекло! Выбор команды ${isCorrect?'ВЕРНЫЙ (+1)':'ОШИБОЧНЫЙ (−2)'}`, isCorrect?"text-emerald-400":"text-red-400");
+  triggerVerdictOverlay('Команда',isCorrect,hasVotes?majorityChoice:null,qData.c,true);
+  hostState.answersReceived={};
 }
 
 /* =========================================================================
@@ -1025,19 +1086,64 @@ function onAnswerLikeSubmitted(player){
   const type=roundType(hostState.currentRound);
   const activePlayer=hostState.players[hostState.activePlayerIdx];
 
+  // Переработанная логика Раунда 13 (Раунд Союза) - ждем ответа ВСЕХ игроков
   if(type==='union'){
     if(hostState.roundStage!=='play') return;
+    const activePlayers = hostState.players;
+    const submittedCount = Object.keys(hostState.answersReceived).length;
+    
+    if (submittedCount < activePlayers.length) {
+      broadcastStateToPlayers();
+      updateHostUI();
+      return; // Ждем пока ответят все остальные игроки
+    }
+    
+    clearInterval(countdownTimer);
     const qData=hostState.roundQuestions.questions[0];
-    const choice=hostState.answersReceived[player.id];
-    const isCorrect=choice===qData.c;
+    const votes = [0, 0, 0, 0];
+    Object.values(hostState.answersReceived).forEach(choice => {
+      votes[choice] = (votes[choice] || 0) + 1;
+    });
+    const majorityChoice = votes.indexOf(Math.max(...votes));
+    const isCorrect = majorityChoice === qData.c;
+
     hostState.players.forEach(p=>changeScore(p, isCorrect?1:-2));
-    logHostEvent(`Коллективный ответ ${isCorrect?'ВЕРНЫЙ (+1 всем)':'ОШИБОЧНЫЙ (−2 всем)'}`, isCorrect?"text-emerald-400":"text-red-400");
-    triggerVerdictOverlay('Команда',isCorrect,choice,qData.c,true);
+    logHostEvent(`Коллективный выбор команды (${String.fromCharCode(1040+majorityChoice)}) ${isCorrect?'ВЕРНЫЙ (+1 всем)':'ОШИБОЧНЫЙ (−2 всем)'}`, isCorrect?"text-emerald-400":"text-red-400");
+    triggerVerdictOverlay('Команда',isCorrect,majorityChoice,qData.c,true);
     hostState.answersReceived={};
     return;
   }
 
   if(!activePlayer || player.id!==activePlayer.id) return;
+
+  // Логика пошагового выбора для Раунда 4 (Минное поле)
+  if(type==='mine'){
+    const qData = getCurrentQuestionData();
+    const choice = hostState.answersReceived[player.id];
+    hostState.rt.clickedOpts = hostState.rt.clickedOpts || [];
+    if (hostState.rt.clickedOpts.includes(choice)) return;
+
+    hostState.rt.clickedOpts.push(choice);
+
+    if (choice === qData.c) {
+      changeScore(player, 2);
+      logHostEvent(`${player.name} нашел верный ответ! (+2)`,"text-emerald-400 font-bold");
+      triggerVerdictOverlay(player.name, true, choice, qData.c);
+      hostState.rt.clickedOpts = [];
+    } else if (choice === qData.mine) {
+      changeScore(player, -2);
+      logHostEvent(`${player.name} подорвался на мине! (-2)`,"text-red-400 font-bold");
+      triggerVerdictOverlay(player.name, false, choice, qData.c);
+      hostState.rt.clickedOpts = [];
+    } else {
+      logHostEvent(`${player.name} открыл нейтральный вариант.`,"text-zinc-400");
+      // Очищаем локальный выбор, чтобы игрок мог сделать следующий шаг
+      hostState.answersReceived = {};
+      broadcastStateToPlayers();
+      updateHostUI();
+    }
+    return;
+  }
 
   if(type==='order'){
     const qData=hostState.roundQuestions.questions[hostState.activeQuestionIdx];
@@ -1091,7 +1197,6 @@ function onAnswerLikeSubmitted(player){
   let delta=0;
   if(type==='classic') delta = isCorrect?1:0;
   else if(type==='classic2') delta = isCorrect?2:0;
-  else if(type==='mine') delta = isCorrect?2:(choice===qData.mine?-2:0);
   else if(type==='king'){
     if(isCorrect){ delta=1; } else { delta=-1; hostState.players.forEach(p=>{ if(p.id!==activePlayer.id) changeScore(p,1); }); }
   }
@@ -1101,7 +1206,8 @@ function onAnswerLikeSubmitted(player){
     delta = isCorrect?val:0;
   }
   else if(type==='carousel'){
-    if(isCorrect){ hostState.rt.bank=(hostState.rt.bank||0)+1; }
+    // Изменение начисления по 0.5 балла (Раунд 11)
+    if(isCorrect){ hostState.rt.bank=(hostState.rt.bank||0)+0.5; }
     else { changeScore(activePlayer, hostState.rt.bank||0); hostState.rt.bankAwarded=true; }
   }
   if(type!=='carousel' && type!=='sabotage') changeScore(activePlayer, delta);
@@ -1152,9 +1258,39 @@ function triggerVerdictOverlay(playerName,isCorrect,choice,correctAnswerIdx,affe
   tvOverlay.classList.add('flex', isCorrect?'bg-emerald-900':'bg-[#29020d]','animate__fadeIn');
   document.getElementById('tv-feedback-icon').innerText=isCorrect?"✅":"❌";
   document.getElementById('tv-feedback-title').innerText=isCorrect?`${playerName}: ВЕРНО!`:`${playerName}: ОШИБКА!`;
-  document.getElementById('tv-feedback-sub').innerText='';
+  
+  // Вывод конкретного выбранного варианта и правильного ответа на ТВ экран
+  const qData = getCurrentQuestionData();
+  let choiceText = "";
+  let correctText = "";
+  if (qData && qData.a) {
+    if (choice !== null && choice !== undefined && qData.a[choice]) {
+      choiceText = `${String.fromCharCode(1040 + choice)}) ${qData.a[choice]}`;
+    }
+    if (correctAnswerIdx !== null && correctAnswerIdx !== undefined && qData.a[correctAnswerIdx]) {
+      correctText = `${String.fromCharCode(1040 + correctAnswerIdx)}) ${qData.a[correctAnswerIdx]}`;
+    }
+  }
 
-  hostState.feedbackData={player:playerName,isCorrect:isCorrect,choice:choice,correctAnswerIdx:correctAnswerIdx,affectsAll:!!affectsAll};
+  let feedbackSubText = "";
+  if (choiceText) {
+    feedbackSubText += `Выбор: <span class="text-yellow-300 font-bold">${choiceText}</span><br>`;
+  }
+  if (correctText) {
+    feedbackSubText += `Правильно: <span class="text-emerald-400 font-bold">${correctText}</span>`;
+  }
+  document.getElementById('tv-feedback-sub').innerHTML = feedbackSubText;
+
+  hostState.feedbackData={
+    player:playerName,
+    isCorrect:isCorrect,
+    choice:choice,
+    correctAnswerIdx:correctAnswerIdx,
+    affectsAll:!!affectsAll,
+    choiceText: choiceText,
+    correctText: correctText
+  };
+  
   broadcastStateToPlayers();
   updateHostUI();
 
@@ -1163,7 +1299,7 @@ function triggerVerdictOverlay(playerName,isCorrect,choice,correctAnswerIdx,affe
     tvOverlay.classList.remove('flex', 'bg-emerald-900', 'bg-[#29020d]', 'animate__fadeIn');
     hostState.feedbackData=null;
     advanceAfterVerdict();
-  },3000);
+  },4000);
 }
 
 function advanceAfterVerdict(){
@@ -1361,7 +1497,8 @@ function oralFinishTurn(){
   changeScore(activePlayer,pts);
   logHostEvent(`${activePlayer.name} завершил блиц: +${pts} б.`,"text-yellow-400 font-bold");
   hostState.rt.correctCount=0;
-  hostState.activeQuestionIdx=0;
+  
+  // УДАЛЕН СБРОС ИНДЕКСА (hostState.activeQuestionIdx=0), ЧТОБЫ ВОПРОСЫ НЕ ПОВТОРЯЛИСЬ
   hostState.activePlayerIdx+=1;
   if(hostState.activePlayerIdx>=hostState.players.length){ finishRoundAndAdvance(); return; }
   runPlayerAnnouncement();
@@ -1404,7 +1541,10 @@ function survivorJudge(isCorrect){
   let guard=0;
   while(!hostState.players[next].alive && guard<20){ next=(next+1)%hostState.players.length; guard++; }
   hostState.activePlayerIdx=next;
-  hostState.activeQuestionIdx=(hostState.activeQuestionIdx+1)%hostState.roundQuestions.questions.length;
+  
+  if (hostState.roundQuestions && hostState.roundQuestions.questions) {
+    hostState.activeQuestionIdx=(hostState.activeQuestionIdx+1)%hostState.roundQuestions.questions.length;
+  }
   runPlayerAnnouncement();
 }
 
@@ -1720,11 +1860,33 @@ function renderHostTVStage(config){
   if(hostState.showOptions){
     qWrapper.className="tv-question-box active text-center w-full";
     previewGrid.className="tv-options-box visible grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto pt-4";
-    previewGrid.innerHTML=qData.a.map((ans,idx)=>`
-      <div class="p-4 bg-zinc-950/90 border-2 border-zinc-800 rounded-2xl text-left text-xs font-bold flex items-center gap-3 shadow-xl hover:border-pink-500 transition-colors animate__animated animate__fadeInUp" style="animation-delay: ${idx * 0.15}s">
-        <span class="bg-pink-600 text-white px-2.5 py-1 rounded-xl text-[10px] font-black uppercase">${String.fromCharCode(1040+idx)}</span>
-        <span class="text-zinc-100 flex-grow text-left">${ans}</span>
-      </div>`).join('');
+    
+    // Специальный рендеринг вариантов для Минного поля (Раунд 4) на ТВ экране
+    if (type === 'mine') {
+      const clicked = hostState.rt.clickedOpts || [];
+      previewGrid.innerHTML=qData.a.map((ans,idx)=>{
+        const isClicked = clicked.includes(idx);
+        let cardClass = "bg-zinc-950/90 border-2 border-zinc-800 text-zinc-100 hover:border-pink-500";
+        let prefix = `<span class="bg-pink-600 text-white px-2.5 py-1 rounded-xl text-[10px] font-black uppercase">${String.fromCharCode(1040+idx)}</span>`;
+        let textClass = "";
+        if (isClicked) {
+          cardClass = "bg-zinc-900 border-2 border-zinc-950 text-zinc-500 opacity-50";
+          prefix = `<span class="bg-zinc-800 text-zinc-600 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase">⚪</span>`;
+          textClass = "line-through";
+        }
+        return `
+          <div class="p-4 rounded-2xl text-left text-xs font-bold flex items-center gap-3 shadow-xl transition-all ${cardClass}">
+            ${prefix}
+            <span class="flex-grow text-left ${textClass}">${ans} ${isClicked ? '(Пусто)' : ''}</span>
+          </div>`;
+      }).join('');
+    } else {
+      previewGrid.innerHTML=qData.a.map((ans,idx)=>`
+        <div class="p-4 bg-zinc-950/90 border-2 border-zinc-800 rounded-2xl text-left text-xs font-bold flex items-center gap-3 shadow-xl hover:border-pink-500 transition-colors animate__animated animate__fadeInUp" style="animation-delay: ${idx * 0.15}s">
+          <span class="bg-pink-600 text-white px-2.5 py-1 rounded-xl text-[10px] font-black uppercase">${String.fromCharCode(1040+idx)}</span>
+          <span class="text-zinc-100 flex-grow text-left">${ans}</span>
+        </div>`).join('');
+    }
   } else {
     qWrapper.className="tv-question-box centered text-center w-full px-4";
     previewGrid.className="tv-options-box grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto pt-4";
@@ -1732,6 +1894,7 @@ function renderHostTVStage(config){
   }
   if(type==='carousel'){ extraIndicator.classList.remove('hidden'); extraIndicator.innerText=`Банк: +${hostState.rt.bank||0}`; }
   if(type==='snowball'){ extraIndicator.classList.remove('hidden'); extraIndicator.innerText=`Ступень ${(hostState.rt.chainIdx||0)+1}/3`; }
+  if(type==='union'){ extraIndicator.classList.remove('hidden'); extraIndicator.innerText=`⏱ ${hostState.rt.timeLeft??''}с`; }
 }
 
 function adjustScoreManual(pId,val){
@@ -1796,24 +1959,24 @@ function copyRoundPrompt(){
     const topics = customTopicsVal ? customTopicsVal.split(',').map(s=>s.trim()) : ["Кино", "Космос", "Еда", "Спорт"];
     promptSpec = `Массив "questions" ровно из 4 объектов (каждый соответствует теме из списка [${topics.join(', ')}]): "category" (название темы из списка), "q" (вопрос средней сложности), "a" (4 варианты ответа), "c" (индекс верного ответа от 0 до 3).`;
   } else if (rNum === 3) {
-    promptSpec = `Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме ${themeVal}), "a" (4 варианта ответа, которые ДОЛЖНЫ быть в правильном порядке. a[0] идет первым, a[1] вторым, a[2] третьим, a[3] четвертым), "c" (0).`;
+    promptSpec = `Массив "questions" из ${pCount} объектов: "q" (вопрос на упорядочивание по теме ${themeVal}), "a" (4 варианта ответа, которые ДОЛЖНЫ быть в правильном порядке. a[0] идет хронологически первым, a[1] вторым, a[2] третьим, a[3] четвертым), "c" (0).`;
   } else if (rNum === 4) {
     promptSpec = `Массив "questions" ровно из ${pCount} объектов по теме ${themeVal}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины — неверного, но крайне правдоподобного ответа, обязательно отличается от c).`;
   } else if (rNum === 5) {
-    promptSpec = `Массив "questions" из 1 объекта по теме {theme}: "q" (вопрос средней сложности), "a" (4 варианта), "c" (индекс верного ответа от 0 до 3).`;
+    promptSpec = `Массив "questions" из 1 объекта по теме ${themeVal}: "q" (вопрос средней сложности), "a" (4 варианта), "c" (индекс верного ответа от 0 до 3).`;
   } else if (rNum === 6) {
     promptSpec = `Массив "questions" ровно из ${pCount} объектов по теме ${themeVal}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного ответа от 0 до 3).`;
   } else if (rNum === 7) {
     promptSpec = `Массив "questions" из 12 объектов для быстрого устного блица по теме ${themeVal}, без вариантов ответов: "q" (короткий вопрос и ответ в скобках, например "Первый космонавт Земли? (Гагарин)").`;
   } else if (rNum === 8) {
     const itemText = secretItemVal ? `конкретно про предмет "${secretItemVal}"` : `какой-то интересный предмет в контексте темы ${themeVal}`;
-    promptSpec = `Массив "questions" ровно из ${pCount} объектов: "q" (главный вопрос-загадка по теме ${themeVal}), "clues" (массив ровно из 4 подсказок ${itemText}, идущих от очень сложной к очевидной), "a" (4 варианта ответа), "c" (индекс верного).`;
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов: "q" (главный вопрос-загадка по теме ${themeVal}, например: "Угадайте предмет по подсказкам"), "clues" (массив ровно из 4 подсказок ${itemText}, идущих от очень сложной/размытой к очевидной), "a" (4 варианта ответа), "c" (индекс верного).`;
   } else if (rNum === 9) {
     promptSpec = `Массив "questions" из 1 объекта: "q" (сложный вопрос с глубокой логикой по теме ${themeVal}), "a" (4 варианта), "c" (индекс верного).`;
   } else if (rNum === 10) {
     promptSpec = `Массив "questions" ровно из ${pCount} объектов, каждый представляет собой цепочку возрастающей сложности по теме ${themeVal}: "chain" (массив ровно из 3 объектов: 1-й легкий, 2-й средний, 3-й сложный. У каждого: "q" (вопрос), "a" (4 варианты), "c" (индекс верного)).`;
   } else if (rNum === 11) {
-    promptSpec = `Массив "questions" из 12 простых и быстрых вопросов по теме ${themeVal}: "q", "a" (4 варианта), "c" (индекс верного).`;
+    promptSpec = `Массив "questions" из 12 простых и быстрых вопросов по теме ${themeVal} строго возрастающей сложности (от супер-простых до очень сложных): "q", "a" (4 варианта), "c" (индекс верного).`;
   } else if (rNum === 12) {
     promptSpec = `Массив "questions" из 12 быстрых устных вопросов по теме ${themeVal}: "q" (вопрос и краткий ответ в скобках).`;
   } else if (rNum === 13) {
@@ -1862,9 +2025,48 @@ function broadcastStateToPlayers(){
     }
   }
 
+  const type = roundType(hostState.currentRound);
   const podium=hostState.gameOver?[...hostState.players].sort((a,b)=>b.score-a.score):[];
 
+  // Формирование корректного текстового лога выбора в вердикт-пакете
+  let choiceText = "";
+  let correctText = "";
+  if (hostState.feedbackData) {
+    const qData = getCurrentQuestionData();
+    if (qData && qData.a) {
+      const chIdx = hostState.feedbackData.choice;
+      const corrIdx = hostState.feedbackData.correctAnswerIdx;
+      if (chIdx !== null && chIdx !== undefined && qData.a[chIdx]) {
+        choiceText = `${String.fromCharCode(1040 + chIdx)}) ${qData.a[chIdx]}`;
+      }
+      if (corrIdx !== null && corrIdx !== undefined && qData.a[corrIdx]) {
+        correctText = `${String.fromCharCode(1040 + corrIdx)}) ${qData.a[corrIdx]}`;
+      }
+    }
+  }
+
   hostState.players.forEach(p=>{
+    // Динамический расчёт активного игрока для Вето (Раунд 15)
+    let activePlayerId = hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].id:null;
+    let activePlayerName = hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].name:"";
+
+    if (type === 'veto') {
+      if (hostState.rt.phase === 'veto') {
+        const vetoActivePlayer = hostState.players[hostState.rt.vetoTurn % hostState.players.length];
+        if (vetoActivePlayer) {
+          activePlayerId = vetoActivePlayer.id;
+          activePlayerName = vetoActivePlayer.name;
+        }
+      } else if (hostState.rt.phase === 'choose') {
+        const chooseActivePlayerId = hostState.rt.pickOrder[hostState.rt.pickTurn];
+        const chooseActivePlayer = hostState.players.find(pl => pl.id === chooseActivePlayerId);
+        if (chooseActivePlayer) {
+          activePlayerId = chooseActivePlayer.id;
+          activePlayerName = chooseActivePlayer.name;
+        }
+      }
+    }
+
     const payload = {
       type:"STATE_UPDATE",
       currentRound:hostState.currentRound,
@@ -1878,10 +2080,14 @@ function broadcastStateToPlayers(){
       questionText:currentQuestionText,
       options:optionsArray,
       clues:cluesArray,
-      activePlayerId: hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].id:null,
-      activePlayerName: hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].name:"",
+      activePlayerId: activePlayerId,
+      activePlayerName: activePlayerName,
       myPlayerId:p.id,
-      feedback:hostState.feedbackData,
+      feedback: hostState.feedbackData ? {
+        ...hostState.feedbackData,
+        choiceText: choiceText,
+        correctText: correctText
+      } : null,
       showOptions:hostState.showOptions,
       rt:hostState.rt,
       playersList:hostState.players.map(pl=>({id:pl.id,name:pl.name,score:pl.score,alive:pl.alive})),
@@ -1889,7 +2095,6 @@ function broadcastStateToPlayers(){
       podium:podium
     };
 
-    /* Публикация состояния в уникальный топик конкретного игрока */
     mqttClient.publish(`${roomTopic}/player/${encodeURIComponent(p.name)}`, JSON.stringify(payload));
   });
 }
