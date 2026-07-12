@@ -7,8 +7,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Montserrat:wght@400;500;700;900&display=swap" rel="stylesheet">
-<!-- Использование стабильной версии PeerJS 1.5.4 -->
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<!-- Использование стабильного CDN Cloudflare для PeerJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
 <style>
 body{font-family:'Montserrat',sans-serif;background-color:#080313;background-image:radial-gradient(circle at 50% 50%,#170732 0%,#080313 100%);}
 .neon-font{font-family:'Dela Gothic One',cursive;}
@@ -358,7 +358,7 @@ const ROUND_PROMPTS_FOR_AI = {
   2:`Массив "questions" ровно из 4 объектов (по одному на каждую тему: {topics}): "category" (название темы из списка), "q" (вопрос средней сложности по этой теме), "a" (4 варианта ответа), "c" (индекс верного ответа от 0 до 3).`,
   3:`Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме {theme}), "a" (4 варианта ответа в правильной последовательности от первого к последнему. То есть a[0] должен идти хронологически или логически первым, a[1] вторым и т.д.), "c" (0).`,
   4:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины, обязательно отличается от c).`,
-  5:`Массив "questions" из 1 объекта по теме {theme}: "q" (вопрос средней сложности), "a" (4 варианты), "c" (индекс верного).`, // Настроен лимит 1 вопроса для Короля горы
+  5:`Массив "questions" из 1 объекта по теме {theme}: "q" (вопрос средней сложности), "a" (4 варианты), "c" (индекс верного).`, // Фикс Бага: Настроен лимит 1 вопроса для Короля горы
   6:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного).`,
   7:`Массив "questions" из 12 объектов для устного блица по теме {theme} (без вариантов): "q" (короткий вопрос и ответ в скобках, например: "Столица Франции? (Париж)").`,
   8:`Массив "questions" из {pCount} объектов: "q" (вопрос "Угадайте секретный объект по подсказкам" по теме {theme}), "clues" (массив ровно из 4 подсказок {secretInfo} от сложной к простой), "a" (4 варианта финального ответа), "c" (индекс верного).`,
@@ -399,23 +399,22 @@ function cleanOralQuestion(qStr) {
 }
 
 /* =========================================================================
-   ПОДКЛЮЧЕНИЕ / ЛОББИ (Явные защищенные настройки)
+   ПОДКЛЮЧЕНИЕ / ЛОББИ (Автоматический выбор https/wss)
 ========================================================================= */
 function initHostLobby(){
+  if (typeof Peer === 'undefined') {
+    alert("Критическая ошибка: библиотека сопряжения PeerJS заблокирована вашим AdBlock или Brave Shields! Отключите их и обновите вкладку.");
+    return;
+  }
+  
   hostState.role='host';
   document.getElementById('screen-entry').classList.add('hidden');
   document.getElementById('screen-host').classList.remove('hidden');
 
   const rawCode=Math.floor(1000+Math.random()*9000).toString();
   
-  /* Подключение к публичному серверу с явным прописыванием SSL параметров */
-  peer=new Peer("DUMAT-"+rawCode, {
-    host: "0.peerjs.com",
-    port: 443,
-    path: "/",
-    secure: true,
-    key: "peerjs"
-  });
+  /* Возврат к стабильному автоматическому конструктору облака PeerJS */
+  peer=new Peer("DUMAT-"+rawCode);
 
   peer.on('open',(id)=>{
     hostState.roomCode=id.replace("DUMAT-","");
@@ -428,11 +427,6 @@ function initHostLobby(){
     if(err.type==='unavailable-id'){
       logHostEvent("Код занят, пересоздаём...","text-red-400");
       setTimeout(initHostLobby,300);
-    }
-    /* Защита от падения сигнального сервера: автоподключение при сбоях */
-    if (err.type === 'server-error') {
-      logHostEvent("Сбой связи с сервером. Повторная попытка через 2 сек...","text-yellow-400");
-      setTimeout(initHostLobby, 2000);
     }
   });
   peer.on('connection',(conn)=>{
@@ -451,6 +445,11 @@ function initHostLobby(){
 }
 
 function joinAsPlayer(){
+  if (typeof Peer === 'undefined') {
+    alert("Критическая ошибка: библиотека сопряжения PeerJS заблокирована вашим AdBlock или Brave Shields! Отключите их и обновите вкладку.");
+    return;
+  }
+
   const code=document.getElementById('input-room-code').value.trim().toUpperCase();
   const name=document.getElementById('input-player-name').value.trim();
   const errBox=document.getElementById('entry-error');
@@ -458,14 +457,8 @@ function joinAsPlayer(){
 
   clientState.name=name; clientState.roomCode=code;
   
-  /* Инициализация игрока с явными SSL настройками во избежание Mixed Content */
-  peer=new Peer({
-    host: "0.peerjs.com",
-    port: 443,
-    path: "/",
-    secure: true,
-    key: "peerjs"
-  });
+  /* Возврат к стабильному автоматическому конструктору облака PeerJS */
+  peer=new Peer();
 
   peer.on('open',()=>{
     const conn=peer.connect("DUMAT-"+code,{reliable:true});
@@ -523,7 +516,7 @@ function handleIncomingPlayerData(conn,data){
 function handleIncomingHostData(data){
   if (!data) return;
 
-  /* Полностью безопасное чтение таблицы очков */
+  /* Полностью безопасное чтение таблицы очков во избежание сбоя */
   if (data.scores) {
     clientState.score = data.scores[clientState.name] || 0;
   } else {
@@ -710,7 +703,7 @@ function renderPlayerPlayStage(data){
       } else {
         /* РАУНД 2: Ждущие игроки видят список доступных категорий, а не просто пустой экран */
         const topicsList = (rt.categories || []).map((c, idx) => `
-          <div class="p-2.5 rounded-xl text-xs font-semibold ${rt.usedCats && Array.isArray(rt.usedCats) && rt.usedCats.includes(idx) ? 'bg-zinc-950/40 text-zinc-700 border border-zinc-900/30 line-through' : 'bg-zinc-900 border border-zinc-800 text-zinc-300'}">
+          <div class="p-2.5 rounded-xl text-xs font-semibold ${(rt.usedCats && Array.isArray(rt.usedCats) && rt.usedCats.includes(idx)) ? 'bg-zinc-950/40 text-zinc-700 border border-zinc-900/30 line-through' : 'bg-zinc-900 border border-zinc-800 text-zinc-300'}">
             ${c}
           </div>`).join('');
         box.innerHTML=`
@@ -1841,7 +1834,7 @@ function copyRoundPrompt(){
     const topics = customTopicsVal ? customTopicsVal.split(',').map(s=>s.trim()) : ["Кино", "Космос", "Еда", "Спорт"];
     promptSpec = `Массив "questions" ровно из 4 объектов (каждый соответствует теме из списка [${topics.join(', ')}]): "category" (название темы из списка), "q" (вопрос средней сложности), "a" (4 варианты ответа), "c" (индекс верного ответа от 0 до 3).`;
   } else if (rNum === 3) {
-    promptSpec = `Массив "questions" ровно из ${pCount} объектов: "q" (вопрос на упорядочивание по теме ${themeVal}, например: восстановить хронологию событий), "a" (4 варианта ответа, которые ДОЛЖНЫ быть в правильном порядке. a[0] идет первым, a[1] вторым, a[2] третьим, a[3] четвертым), "c" (0).`;
+    promptSpec = `Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме ${themeVal}, например: восстановить хронологию событий), "a" (4 варианта ответа, которые ДОЛЖНЫ быть в правильном порядке. a[0] идет первым, a[1] вторым, a[2] третьим, a[3] четвертым), "c" (0).`;
   } else if (rNum === 4) {
     promptSpec = `Массив "questions" ровно из ${pCount} объектов по теме ${themeVal}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины — неверного, но крайне правдоподобного ответа, обязательно отличается от c).`;
   } else if (rNum === 5) {
