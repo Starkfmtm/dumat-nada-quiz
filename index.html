@@ -1,0 +1,1922 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ДУМАТЬ НАДО — Интеллектуальный Квиз</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Montserrat:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<style>
+body{font-family:'Montserrat',sans-serif;background-color:#080313;background-image:radial-gradient(circle at 50% 50%,#170732 0%,#080313 100%);}
+.neon-font{font-family:'Dela Gothic One',cursive;}
+.neon-shadow-pink{box-shadow:0 0 25px rgba(255,0,85,.45),inset 0 0 10px rgba(255,0,85,.2);border:3px solid #ff0055;}
+.neon-shadow-cyan{box-shadow:0 0 25px rgba(0,245,255,.45),inset 0 0 10px rgba(0,245,255,.2);border:3px solid #00f5ff;}
+.neon-shadow-yellow{box-shadow:0 0 25px rgba(250,204,21,.4),inset 0 0 10px rgba(250,204,21,.15);border:3px solid #facc15;}
+.stagger-1{animation-delay:.2s}.stagger-2{animation-delay:.4s}.stagger-3{animation-delay:.6s}
+
+/* Плавная анимация появления вопроса и вариантов (стиль Jackbox/Бредовуха) */
+.tv-question-box {
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.8s ease;
+}
+.tv-question-box.centered {
+  transform: translateY(40px) scale(1.1);
+}
+.tv-question-box.active {
+  transform: translateY(-20px) scale(0.95);
+}
+.tv-options-box {
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.8s ease, max-height 0.8s ease;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(30px);
+  overflow: hidden;
+}
+.tv-options-box.visible {
+  max-height: 600px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.player-question-box {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease;
+}
+.player-question-box.centered {
+  transform: translateY(30px) scale(1.05);
+}
+.player-question-box.active {
+  transform: translateY(-10px) scale(0.95);
+}
+.player-options-box {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.6s ease, max-height 0.6s ease;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(20px);
+  overflow: hidden;
+}
+.player-options-box.visible {
+  max-height: 500px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pill-btn{transition:all .15s ease}
+.pill-btn:disabled{opacity:.35;cursor:not-allowed}
+.chip{display:inline-flex;align-items:center;gap:.25rem}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:4px}
+</style>
+</head>
+<body class="text-zinc-100 min-h-full flex flex-col justify-between overflow-x-hidden selection:bg-pink-600 selection:text-white">
+
+<!-- ================= ЭКРАН ВХОДА ================= -->
+<div id="screen-entry" class="flex-grow flex flex-col justify-center items-center p-4">
+  <div class="max-w-md w-full text-center space-y-8">
+    <div class="relative inline-block rotate-[-2deg] animate__animated animate__backInDown">
+      <h1 class="neon-font text-5xl md:text-6xl text-yellow-300 drop-shadow-[0_5px_0_#ff0055] uppercase tracking-wider">ДУМАТЬ НАДО</h1>
+      <span class="absolute -bottom-3 right-1 bg-cyan-400 text-black font-black text-[10px] px-2 py-1 uppercase rounded rotate-[4deg] shadow-lg">PARTY QUIZ GAME</span>
+    </div>
+    <p class="text-zinc-400 text-xs font-semibold max-w-sm mx-auto leading-relaxed animate__animated animate__fadeIn stagger-1">
+      Интеллектуальный баттл для компании на 15 раундов. Один экран (ТВ) показывает игру, игроки отвечают со своих телефонов.
+    </p>
+    <div class="space-y-4 pt-4">
+      <div class="animate__animated animate__fadeInUp stagger-2">
+        <button onclick="initHostLobby()" class="w-full bg-pink-600 hover:bg-pink-500 text-white font-black py-4 px-6 rounded-2xl border-b-8 border-pink-900 transition-all text-base tracking-wider uppercase">Создать (ТВ-экран)</button>
+      </div>
+      <div class="animate__animated animate__fadeInUp stagger-3">
+        <div class="bg-zinc-950/80 p-5 rounded-3xl border-2 border-zinc-800 space-y-3 shadow-2xl">
+          <h3 class="text-[10px] font-black uppercase text-cyan-400 tracking-widest">Присоединиться по коду</h3>
+          <input id="input-room-code" type="text" placeholder="КОД ИЗ 4 ЦИФР" class="w-full bg-[#080313] border-2 border-zinc-800 focus:border-cyan-400 rounded-xl py-3 px-4 text-center font-bold text-lg uppercase tracking-widest text-white focus:outline-none transition-colors">
+          <input id="input-player-name" type="text" placeholder="ИМЯ ИГРОКА" class="w-full bg-[#080313] border-2 border-zinc-800 focus:border-cyan-400 rounded-xl py-3 px-4 text-center font-bold text-sm text-white focus:outline-none transition-colors">
+          <button onclick="joinAsPlayer()" class="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-black py-4 px-6 rounded-xl border-b-4 border-cyan-700 transition-all text-xs tracking-widest uppercase">Войти в лобби</button>
+          <div id="entry-error" class="text-[10px] text-red-400 font-bold hidden"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ЭКРАН ХОСТА ================= -->
+<div id="screen-host" class="hidden flex-grow flex flex-col justify-between max-w-7xl w-full mx-auto p-4 md:p-6 gap-6">
+  <div class="flex flex-col lg:flex-row gap-6 items-stretch flex-grow">
+    <div class="flex-grow lg:w-2/3 flex flex-col justify-between min-h-[550px]">
+      <div class="bg-zinc-950/60 border-2 border-pink-600/30 p-4 rounded-3xl flex justify-between items-center shadow-2xl">
+        <div>
+          <h2 id="round-indicator-host" class="neon-font text-yellow-300 text-sm">ФАЗА ОЖИДАНИЯ</h2>
+          <p id="round-name-host" class="text-[10px] uppercase tracking-widest font-black text-cyan-400">ПОДКЛЮЧЕНИЕ СМАРТФОНОВ / ПК</p>
+        </div>
+        <div class="text-right">
+          <span class="text-[9px] text-zinc-500 uppercase font-black">КОД КОМНАТЫ:</span>
+          <div id="room-code-display" class="neon-font text-2xl text-white tracking-widest animate-pulse">....</div>
+        </div>
+      </div>
+
+      <div id="tv-board" class="neon-shadow-pink bg-[#090514] rounded-[2.5rem] p-6 md:p-10 flex-grow flex flex-col justify-center items-center min-h-[350px] relative my-6 overflow-hidden">
+
+        <div id="tv-lobby-stage" class="w-full text-center space-y-6 animate__animated animate__fadeIn">
+          <h3 class="neon-font text-2xl text-cyan-400 uppercase tracking-widest animate-pulse">Ожидание игроков</h3>
+          <div id="tv-lobby-players-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 max-w-3xl mx-auto"></div>
+        </div>
+
+        <div id="tv-rules-stage" class="hidden text-center space-y-6 max-w-xl animate__animated animate__zoomIn">
+          <span class="text-5xl animate-bounce inline-block">📋</span>
+          <h3 id="tv-rules-title" class="neon-font text-2xl text-yellow-300 uppercase tracking-wide"></h3>
+          <p id="tv-rules-desc" class="text-xs md:text-sm text-zinc-300 leading-relaxed border-l-4 border-pink-500 pl-4 py-2 text-left"></p>
+          <div class="pt-4">
+            <span class="bg-pink-500/10 border border-pink-400/30 text-pink-300 text-[10px] px-4 py-2 rounded-full uppercase font-black tracking-widest">Ведущий готовит раунд на панели...</span>
+          </div>
+        </div>
+
+        <div id="tv-reveal-stage" class="hidden absolute inset-0 bg-[#00f5ff] text-black flex flex-col justify-center items-center text-center p-8 z-40 animate__animated">
+          <h2 class="neon-font text-4xl uppercase tracking-wider mb-2 animate__animated animate__bounceIn">ПРИГОТОВЬТЕСЬ!</h2>
+          <p class="text-xs uppercase font-black tracking-widest text-zinc-800 mb-6">Тема раунда:</p>
+          <div class="bg-black text-cyan-300 neon-font text-xl md:text-2xl py-4 px-10 rounded-2xl rotate-[-2deg] border-4 border-black shadow-2xl uppercase tracking-widest animate__animated animate__swing animate__infinite"><span id="tv-reveal-theme">КОСМОС</span></div>
+        </div>
+
+        <div id="tv-player-announcement-stage" class="hidden absolute inset-0 bg-pink-600 text-white flex flex-col justify-center items-center text-center p-8 z-40 animate__animated">
+          <span class="text-7xl mb-4 animate-bounce">⚡</span>
+          <p class="text-xs uppercase font-black tracking-widest text-pink-200 mb-2">Приготовиться к ответу!</p>
+          <h2 id="tv-player-announcement-name" class="neon-font text-3xl md:text-5xl uppercase tracking-wider text-yellow-300">ИГРОК</h2>
+        </div>
+
+        <div id="tv-play-stage" class="hidden text-center w-full space-y-6 animate__animated animate__fadeIn">
+          <div class="flex justify-center flex-wrap gap-2">
+            <span id="tv-active-turn-indicator" class="bg-yellow-400 text-black text-xs font-black px-4 py-1.5 uppercase rounded-full tracking-wider animate-pulse">Отвечает: Игрок</span>
+            <span id="tv-extra-indicator" class="hidden bg-indigo-500 text-white text-xs font-black px-4 py-1.5 uppercase rounded-full tracking-wider"></span>
+          </div>
+          <div id="tv-question-wrapper" class="tv-question-box transform">
+            <h4 id="tv-question-text" class="neon-font text-lg md:text-2xl text-zinc-100 leading-normal uppercase tracking-wide px-4"></h4>
+          </div>
+          <div id="tv-answers-preview" class="tv-options-box"></div>
+          <div id="tv-blackbox-clues" class="hidden max-w-xl mx-auto space-y-2 text-left"></div>
+          <div id="tv-categories-grid" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-3xl mx-auto pt-2"></div>
+          <div id="tv-bids-list" class="hidden text-left max-w-md mx-auto space-y-1 text-xs font-bold"></div>
+        </div>
+
+        <div id="tv-feedback-overlay" class="hidden absolute inset-0 z-50 flex flex-col justify-center items-center text-center p-8 animate__animated animate__faster">
+          <span id="tv-feedback-icon" class="text-8xl mb-4"></span>
+          <h2 id="tv-feedback-title" class="neon-font text-3xl md:text-5xl uppercase tracking-widest"></h2>
+          <p id="tv-feedback-sub" class="text-xs text-zinc-200 mt-2 font-bold"></p>
+        </div>
+
+        <div id="tv-podium-stage" class="hidden text-center space-y-4 max-w-md mx-auto w-full">
+          <span class="text-7xl animate-bounce inline-block">👑</span>
+          <h3 class="neon-font text-3xl text-yellow-300">ИТОГИ ИГРЫ</h3>
+          <div id="tv-podium-list" class="space-y-3 pt-2"></div>
+        </div>
+
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="tv-scoreboard"></div>
+    </div>
+
+    <!-- Боковая панель ведущего -->
+    <div class="lg:w-1/3 flex flex-col gap-6">
+      <div class="neon-shadow-pink bg-zinc-950 rounded-[2rem] p-5 border-l-4 border-yellow-500">
+        <h4 class="neon-font text-[10px] text-yellow-300 uppercase tracking-widest mb-2 border-b border-zinc-900 pb-1">💡 ШПАРГАЛКА ВЕДУЩЕГО:</h4>
+        <div id="host-cheat-sheet" class="text-xs text-zinc-300 leading-relaxed font-semibold">Раунд еще не запущен. Ожидание данных...</div>
+      </div>
+
+      <div class="neon-shadow-yellow bg-zinc-950 rounded-[2rem] p-5 space-y-3" id="host-round-controls-wrap">
+        <h3 class="neon-font text-[10px] text-yellow-300 uppercase tracking-widest border-b border-zinc-800 pb-2">🎛️ УПРАВЛЕНИЕ РАУНДОМ</h3>
+        <div id="host-round-controls" class="text-xs text-zinc-400">Загрузите вопросы, чтобы увидеть управление.</div>
+      </div>
+
+      <div class="neon-shadow-cyan bg-zinc-950 rounded-[2rem] p-5 space-y-4">
+        <div class="flex justify-between items-center border-b border-zinc-800 pb-2">
+          <h3 class="neon-font text-[10px] text-cyan-400 uppercase tracking-widest">🕹️ КОНСОЛЬ ВЕДУЩЕГО</h3>
+          <span class="text-[9px] font-black text-zinc-500 uppercase">Раунд <span id="host-round-num">1</span>/15</span>
+        </div>
+        <div class="space-y-3">
+          <!-- Сюда динамически монтируются поля конфигурации каждого раунда -->
+          <div id="host-dynamic-configurator" class="space-y-3"></div>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="copyRoundPrompt()" class="bg-pink-600 hover:bg-pink-500 text-white text-[10px] font-extrabold py-3 px-2 rounded-xl border-b-4 border-pink-900 transition-colors uppercase">1. Копировать промпт</button>
+            <button onclick="parseManualJSON()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black py-3 px-2 rounded-xl border-b-4 border-emerald-950 transition-colors uppercase">2. Принять JSON</button>
+          </div>
+          <div>
+            <label class="block text-[9px] font-black uppercase text-zinc-500 mb-1">JSON-код из ИИ:</label>
+            <textarea id="host-ai-textarea" placeholder="Вставьте скопированный у ИИ JSON..." class="w-full h-20 bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-400"></textarea>
+          </div>
+          <button onclick="hostSkipRound()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-black py-2 rounded-xl uppercase tracking-widest">⏭ Пропустить раунд</button>
+        </div>
+      </div>
+
+      <div class="neon-shadow-cyan bg-zinc-950 rounded-[2rem] p-5 flex-grow flex flex-col justify-between gap-4">
+        <div class="space-y-4">
+          <h4 class="text-[10px] font-black uppercase text-zinc-400 tracking-widest border-b border-zinc-900 pb-2">Модерация лобби</h4>
+          <div id="host-connections-box" class="space-y-2">
+            <label class="block text-[9px] font-bold text-zinc-500 uppercase">Событий:</label>
+            <div id="event-log" class="text-[10px] font-bold space-y-0.5 text-zinc-400 max-h-[90px] overflow-y-auto">Ожидание игроков...</div>
+          </div>
+          <div class="space-y-2">
+            <label class="block text-[9px] font-bold text-zinc-500 uppercase">Ручное изменение очков:</label>
+            <div id="host-manual-scores" class="grid grid-cols-1 gap-1.5 max-h-[150px] overflow-y-auto"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ЭКРАН ИГРОКА ================= -->
+<div id="screen-player" class="hidden flex-grow flex flex-col justify-between max-w-7xl w-full mx-auto p-4 md:p-6 gap-6">
+  <div class="flex flex-col lg:flex-row gap-6 items-stretch flex-grow">
+    <div class="flex-grow w-full flex flex-col justify-between min-h-[550px]">
+      <div class="bg-zinc-950/60 border-2 border-pink-600/30 p-4 rounded-3xl flex justify-between items-center shadow-2xl">
+        <div>
+          <h2 id="round-indicator-player" class="neon-font text-yellow-300 text-sm">ФАЗА ОЖИДАНИЯ</h2>
+          <p id="round-name-player" class="text-[10px] uppercase tracking-widest font-black text-cyan-400">МЕХАНИКА: КЛАССИКА</p>
+        </div>
+        <div class="text-right">
+          <span class="text-[9px] text-zinc-500 uppercase font-black">ВЫ ВОШЛИ КАК:</span>
+          <div id="player-my-name-display" class="neon-font text-xl text-indigo-400 tracking-wider font-black">Игрок</div>
+        </div>
+      </div>
+
+      <div id="player-tv-board" class="neon-shadow-pink bg-[#090514] rounded-[2.5rem] p-6 md:p-10 flex-grow flex flex-col justify-center items-center min-h-[350px] relative my-6 overflow-hidden">
+
+        <div id="player-ctrl-waiting" class="text-center space-y-6 animate__animated animate__zoomIn w-full">
+          <span class="text-5xl animate-bounce inline-block">📋</span>
+          <h2 id="player-rules-title-text" class="neon-font text-2xl text-yellow-300 uppercase tracking-widest">РАЗМИНКА</h2>
+          <div class="bg-zinc-950/80 p-5 rounded-3xl border-2 border-pink-500/30 text-left max-w-sm mx-auto shadow-xl">
+            <p id="player-round-rules-preview" class="text-xs text-zinc-300 leading-relaxed font-semibold"></p>
+          </div>
+        </div>
+
+        <div id="player-announcement-stage" class="hidden absolute inset-0 bg-pink-600 text-white flex flex-col justify-center items-center text-center p-8 z-40 animate__animated">
+          <span class="text-7xl mb-4 animate-bounce">⚡</span>
+          <p class="text-xs uppercase font-black tracking-widest text-pink-200 mb-2">Приготовиться к ответу!</p>
+          <h2 id="player-announcement-name" class="neon-font text-3xl md:text-5xl uppercase tracking-wider text-yellow-300 font-black">ИГРОК</h2>
+        </div>
+
+        <div id="player-ctrl-standby" class="hidden text-center w-full space-y-6 animate__animated animate__fadeIn">
+          <div class="flex justify-center flex-wrap gap-2">
+            <span id="player-active-turn-indicator" class="bg-yellow-400 text-black text-xs font-black px-4 py-1.5 uppercase rounded-full tracking-wider animate-pulse">Отвечает: Игрок</span>
+          </div>
+          <div id="player-standby-question-wrapper" class="player-question-box transform">
+            <h4 id="player-standby-question-text" class="neon-font text-lg md:text-2xl text-zinc-100 leading-normal uppercase tracking-wide px-4"></h4>
+          </div>
+          <div id="player-standby-answers-preview" class="player-options-box"></div>
+        </div>
+
+        <div id="player-ctrl-abcd" class="hidden w-full space-y-6 animate__animated animate__fadeIn animate__faster">
+          <div class="flex justify-center"><span class="bg-pink-600 text-white text-xs font-black px-4 py-1.5 uppercase rounded-full tracking-wider animate-pulse">Ваш ход!</span></div>
+          <div id="player-active-question-wrapper" class="player-question-box transform">
+            <h4 id="player-question-display" class="neon-font text-lg md:text-2xl text-zinc-100 leading-normal uppercase tracking-wide px-4"></h4>
+          </div>
+          <div id="player-buttons-grid" class="player-options-box"></div>
+        </div>
+
+        <div id="player-ctrl-special" class="hidden w-full space-y-4 animate__animated animate__fadeIn"></div>
+
+        <div id="player-ctrl-done" class="hidden text-center w-full space-y-4 animate__animated animate__fadeIn">
+          <span class="text-5xl inline-block animate-pulse">📡</span>
+          <h3 class="neon-font text-sm text-cyan-400">Ответ отправлен!</h3>
+          <p class="text-[10px] text-zinc-500">Ожидайте вердикта...</p>
+        </div>
+
+        <div id="player-reveal-stage" class="hidden absolute inset-0 bg-[#00f5ff] text-black flex flex-col justify-center items-center text-center p-8 z-40 animate__animated">
+          <h2 class="neon-font text-3xl uppercase tracking-wider mb-2 animate__animated animate__bounceIn">ПРИГОТОВЬТЕСЬ!</h2>
+          <p class="text-xs uppercase font-black tracking-widest text-zinc-800 mb-6">Тема раунда:</p>
+          <div class="bg-black text-cyan-300 neon-font text-xl py-4 px-10 rounded-2xl rotate-[-2deg] border-4 border-black shadow-2xl uppercase tracking-widest animate__animated animate__swing animate__infinite"><span id="player-reveal-theme">КОСМОС</span></div>
+        </div>
+
+        <div id="player-feedback-overlay" class="hidden absolute inset-0 z-50 flex flex-col justify-center items-center text-center p-8 animate__animated animate__faster">
+          <span id="player-feedback-icon" class="text-8xl mb-4"></span>
+          <h2 id="player-feedback-title" class="neon-font text-3xl md:text-5xl uppercase tracking-widest"></h2>
+        </div>
+
+        <div id="player-podium-stage" class="hidden text-center space-y-4 max-w-md mx-auto w-full">
+          <span class="text-7xl animate-bounce inline-block">👑</span>
+          <h3 class="neon-font text-3xl text-yellow-300">ИГРА ОКОНЧЕНА</h3>
+          <div id="player-podium-list" class="space-y-3 pt-2 text-left"></div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 animate__animated animate__fadeInUp" id="player-scoreboard"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   ДАННЫЕ И КОНФИГУРАЦИЯ РАУНДОВ
+========================================================================= */
+const ROUND_DETAILS = {
+  1:{name:"Классика (Разминка)",rules:"Каждый игрок по очереди отвечает на свой вопрос. Легкая эрудиция. Верно: +1. Штрафа нет."},
+  2:{name:"Слепой выбор",rules:"Игрок выбирает тему из списка. Ценность вопроса (1, 2 или 3 балла) определяется случайно ПОСЛЕ выбора темы. Штрафа нет."},
+  3:{name:"По порядку",rules:"Нужно расставить 4 варианта в верном порядке (нажимайте по очереди). Верно: +2. Ошибка: 0."},
+  4:{name:"Минное поле",rules:"4 варианта: 1 верный (+2), 2 нейтральных (0) и 1 МИНА (-2). Будьте осторожны."},
+  5:{name:"Король горы",rules:"Вопрос — только для текущего лидера. Верно: лидер +1. Ошибка: лидер −1, все остальные +1."},
+  6:{name:"Злой Квиз",rules:"Отвечаете по очереди. Верный ответ — заберите 1 балл у любого соперника. Ошибка никого не наказывает."},
+  7:{name:"Блиц-контроль",rules:"45 секунд на игрока, вопросы без вариантов, ведущий сам судит устные ответы. +1 балл за каждые 2 верных."},
+  8:{name:"Черный ящик",rules:"Ведущий читает подсказки по одной (4 шт., сложность убывает). Ответ после 1-й: +4, 2-й: +3, 3-й: +2, 4-й: +1. Ошибка — 0 и выход."},
+  9:{name:"Своя игра (Аукцион)",rules:"Игроки делают ставки своими баллами. Победитель торгов отвечает на вопрос: верно +ставка, ошибка −ставка."},
+  10:{name:"Снежный ком",rules:"Цепочка из 3 вопросов возрастающей сложности. 1-й: +1 (можно забрать), 2-й: +2, 3-й: +3. Ошибка обнуляет всё за текущий раунд."},
+  11:{name:"Карусель",rules:"Игроки отвечают по кругу. Верный ответ добавляет +1 в общий банк. Ошибка прерывает круг — банк забирает последний ответивший верно."},
+  12:{name:"Последний выживший",rules:"Быстрые устные вопросы, 5 секунд на ответ. Ошибка/тайм-аут — выбывание. Победитель получает +3."},
+  13:{name:"Раунд Союза",rules:"Один сложный вопрос на всех. Отвечает вся команда сообща. Верно: +1 каждому. Неверно: −2 каждому."},
+  14:{name:"Финальный спринт",rules:"Хардкорные вопросы. Верно: +2. Штрафа нет."},
+  15:{name:"Вето и Ва-банк",rules:"8 категорий. По очереди вычеркиваете (вето) лишние, затем выбираете тему и делаете скрытую ставку (до ва-банка). Верно: +ставка, ошибка: −ставка."}
+};
+
+const ROUND_TYPE = {1:'classic',2:'blind',3:'order',4:'mine',5:'king',6:'sabotage',7:'oral',8:'blackbox',9:'auction',10:'snowball',11:'carousel',12:'survivor',13:'union',14:'classic2',15:'veto'};
+
+// Структура конфигураций полей ввода на панели хоста
+const ROUND_CONFIGS = {
+  1: { fields: [{ id: 'theme', label: 'Тема раунда', type: 'text', default: 'Общие знания' }] },
+  2: { fields: [
+    { id: 'theme', label: 'Глобальная тематика', type: 'text', default: 'Смешанный микс' },
+    { id: 'topics', label: '4 Темы через запятую', type: 'text', default: 'Кинематограф, Разработки, Анатомия, Земля' }
+  ]},
+  3: { fields: [{ id: 'theme', label: 'Тема сортировки', type: 'text', default: 'Исторические события' }] },
+  4: { fields: [{ id: 'theme', label: 'Тема раунда', type: 'text', default: 'Популярные заблуждения' }] },
+  5: { fields: [{ id: 'theme', label: 'Тема для лидера', type: 'text', default: 'Эрудиция' }] },
+  6: { fields: [{ id: 'theme', label: 'Тема саботажа', type: 'text', default: 'Мировые рекорды' }] },
+  7: { fields: [{ id: 'theme', label: 'Тема устных вопросов', type: 'text', default: 'Короткие факты' }] },
+  8: { fields: [
+    { id: 'theme', label: 'Тема предмета', type: 'text', default: 'Изобретения' },
+    { id: 'secret_item', label: 'Секретный предмет (пусто - довериться ИИ)', type: 'text', default: '' }
+  ]},
+  9: { fields: [{ id: 'theme', label: 'Тема аукциона', type: 'text', default: 'Парадоксы науки' }] },
+  10: { fields: [{ id: 'theme', label: 'Тема снежного кома', type: 'text', default: 'Эволюция технологий' }] },
+  11: { fields: [{ id: 'theme', label: 'Тема карусели', type: 'text', default: 'Скоростные вопросы' }] },
+  12: { fields: [{ id: 'theme', label: 'Тема выживания', type: 'text', default: 'Поп-культура' }] },
+  13: { fields: [{ id: 'theme', label: 'Тема раунда союза', type: 'text', default: 'Сложные концепции' }] },
+  14: { fields: [{ id: 'theme', label: 'Тема спринта', type: 'text', default: 'Тяжелая артиллерия эрудиции' }] },
+  15: { fields: [
+    { id: 'theme', label: 'Тема финала', type: 'text', default: 'Решающая битва' },
+    { id: 'topics', label: 'Список категорий (через запятую)', type: 'text', default: 'Искусство, Фильмы, Космос, Мифы, Автомобили, Еда, Рок-музыка, Литература' }
+  ]}
+};
+
+const ROUND_PROMPTS_FOR_AI = {
+  1:`Массив "questions" ровно из {pCount} объектов: "q" (очень легкий вопрос по теме {theme}), "a" (4 варианта ответа), "c" (индекс верного ответа от 0 до 3).`,
+  2:`Массив "questions" ровно из 4 объектов (по одному на каждую тему: {topics}): "category" (название темы из списка), "q" (вопрос средней сложности по этой теме), "a" (4 варианта ответа), "c" (индекс верного ответа от 0 до 3).`,
+  3:`Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме {theme}), "a" (4 варианта ответа в правильной последовательности от первого к последнему. То есть a[0] должен идти хронологически или логически первым, a[1] вторым и т.д.), "c" (0).`,
+  4:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины, обязательно отличается от c).`,
+  5:`Массив "questions" из 1 объекта по теме {theme}: "q" (вопрос средней сложности), "a" (4 варианты), "c" (индекс верного).`, // Фикс Бага: Настроен лимит 1 вопроса для Короля горы
+  6:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного).`,
+  7:`Массив "questions" из 12 объектов для устного блица по теме {theme} (без вариантов): "q" (короткий вопрос и ответ в скобках, например: "Столица Франции? (Париж)").`,
+  8:`Массив "questions" из {pCount} объектов: "q" (вопрос "Угадайте секретный объект по подсказкам" по теме {theme}), "clues" (массив ровно из 4 подсказок {secretInfo} от сложной к простой), "a" (4 варианта финального ответа), "c" (индекс верного).`,
+  9:`Массив "questions" из 1 объекта: "q" (сложный вопрос с глубокой логикой по теме ${theme}), "a" (4 варианты), "c" (индекс верного).`,
+  10:`Массив "questions" из {pCount} объектов: "chain" (массив из 3 объектов цепочки вопросов по теме {theme} возрастающей сложности: 1-й легкий, 2-й средний, 3-й сложный. У каждого: "q" (вопрос), "a" (4 варианта), "c" (индекс верного)).`,
+  11:`Массив "questions" из 12 простых и быстрых вопросов по теме {theme}: "q", "a" (4 варианта), "c" (индекс верного).`,
+  12:`Массив "questions" из 12 быстрых устных вопросов по теме {theme}: "q" (вопрос и краткий ответ в скобках).`,
+  13:`Массив "questions" из 1 сложного вопроса на коллективное обсуждение по теме {theme}: "q", "a" (4 варианта), "c" (индекс верного).`,
+  14:`Массив "questions" из {pCount} сложнейших вопросов по теме {theme}: "q", "a" (4 варианта), "c" (индекс верного).`,
+  15:`Массив "categories" ровно из {catCount} объектов (соответствующих списку категорий: {topics}): "name" (название темы), "q" (сложный вопрос), "a" (4 варианта), "c" (индекс верного).`
+};
+
+/* =========================================================================
+   СОСТОЯНИЕ ИГРЫ
+========================================================================= */
+let peer=null;
+let hostState={
+  role:null, roomCode:null, players:[], currentRound:1, roundStage:'lobby',
+  roundQuestions:null, activeQuestionIdx:0, activePlayerIdx:0, answersReceived:{},
+  showOptions:false, feedbackData:null, gameOver:false, theme:'Разминка',
+  rt:{} 
+};
+let clientState={conn:null,name:"",score:0,roomCode:"",myId:null};
+let countdownTimer=null;
+
+function roundType(n){return ROUND_TYPE[n]||'classic';}
+function clampScore(v){return Math.max(0,v);}
+function changeScore(player,delta){player.score=clampScore(player.score+delta);}
+function getLeader(){
+  if(hostState.players.length===0) return null;
+  return hostState.players.reduce((best,p)=>p.score>best.score?p:best, hostState.players[0]);
+}
+
+/* Функция очистки устных вопросов от правильного ответа на публичных экранах */
+function cleanOralQuestion(qStr) {
+  if (!qStr) return "";
+  return qStr.replace(/\s*\(.*?\)\s*/g, "").trim();
+}
+
+/* =========================================================================
+   ПОДКЛЮЧЕНИЕ / ЛОББИ
+========================================================================= */
+function initHostLobby(){
+  hostState.role='host';
+  document.getElementById('screen-entry').classList.add('hidden');
+  document.getElementById('screen-host').classList.remove('hidden');
+
+  const rawCode=Math.floor(1000+Math.random()*9000).toString();
+  peer=new Peer("DUMAT-"+rawCode);
+
+  peer.on('open',(id)=>{
+    hostState.roomCode=id.replace("DUMAT-","");
+    document.getElementById('room-code-display').innerText=hostState.roomCode;
+    logHostEvent(`Лобби создано! Код: ${hostState.roomCode}`,"text-cyan-400 font-bold");
+  });
+  peer.on('error',(err)=>{
+    if(err.type==='unavailable-id'){
+      logHostEvent("Код занят, пересоздаём...","text-red-400");
+      setTimeout(initHostLobby,300);
+    } else {
+      logHostEvent("Ошибка сети: "+err.type,"text-red-400");
+    }
+  });
+  peer.on('connection',(conn)=>{
+    conn.on('data',(data)=>handleIncomingPlayerData(conn,data));
+    conn.on('close',()=>{
+      const p=hostState.players.find(pl=>pl.peerId===conn.peer);
+      if(p){ logHostEvent(`${p.name} отключился.`,"text-red-400"); updateHostUI(); }
+    });
+  });
+
+  setInterval(()=>{
+    hostState.players.forEach(p=>{ if(p.conn&&p.conn.open) p.conn.send({type:"PING"}); });
+  },5000);
+
+  updateHostUI();
+}
+
+function joinAsPlayer(){
+  const code=document.getElementById('input-room-code').value.trim().toUpperCase();
+  const name=document.getElementById('input-player-name').value.trim();
+  const errBox=document.getElementById('entry-error');
+  if(!code||!name){ errBox.innerText="Заполните код комнаты и имя!"; errBox.classList.remove('hidden'); return; }
+
+  clientState.name=name; clientState.roomCode=code;
+  peer=new Peer();
+  peer.on('open',()=>{
+    const conn=peer.connect("DUMAT-"+code,{reliable:true});
+    clientState.conn=conn;
+    let opened=false;
+    conn.on('open',()=>{
+      opened=true;
+      document.getElementById('screen-entry').classList.add('hidden');
+      document.getElementById('screen-player').classList.remove('hidden');
+      document.getElementById('player-my-name-display').innerText=name;
+      conn.send({type:"JOIN",name:name});
+    });
+    conn.on('data',(data)=>{ if(data.type==="PING") return; handleIncomingHostData(data); });
+    conn.on('close',()=>{ alert("Соединение потеряно! Обновите страницу и введите то же имя."); });
+    conn.on('error',()=>{ if(!opened){ errBox.innerText="Комната не найдена."; errBox.classList.remove('hidden'); } });
+  });
+  peer.on('error',(err)=>{ errBox.innerText="Ошибка: "+err.type; errBox.classList.remove('hidden'); });
+}
+
+function handleIncomingPlayerData(conn,data){
+  if(data.type==="JOIN"){
+    const existing=hostState.players.find(p=>p.name===data.name);
+    if(existing){
+      existing.conn=conn; existing.peerId=conn.peer;
+      logHostEvent(`${data.name} ПЕРЕПОДКЛЮЧИЛСЯ! Счёт сохранён: ${existing.score}`,"text-yellow-400 font-bold");
+    } else {
+      hostState.players.push({id:hostState.players.length,name:data.name,score:0,conn:conn,peerId:conn.peer,alive:true});
+      logHostEvent(`Игрок ${data.name} подключился!`,"text-cyan-400 font-bold");
+    }
+    broadcastStateToPlayers(); updateHostUI();
+    return;
+  }
+  const player=hostState.players.find(p=>p.peerId===conn.peer);
+  if(!player) return;
+
+  if(data.type==="SUBMIT_ANSWER"){ hostState.answersReceived[player.id]=data.choice; logHostEvent(`${player.name} ответил.`,"text-zinc-500"); onAnswerLikeSubmitted(player); }
+  else if(data.type==="SUBMIT_ORDER"){ hostState.answersReceived[player.id]=data.order; logHostEvent(`${player.name} отправил порядок.`,"text-zinc-500"); onAnswerLikeSubmitted(player); }
+  else if(data.type==="SELECT_TARGET"){ handleSabotageTarget(player,data.targetId); }
+  else if(data.type==="SELECT_CATEGORY"){ handleCategorySelect(player,data.catIndex); }
+  else if(data.type==="VETO_CATEGORY"){ handleVeto(player,data.catIndex); }
+  else if(data.type==="CONTINUE_OR_BANK"){ handleSnowballDecision(player,data.decision); }
+  else if(data.type==="SUBMIT_BID"){ hostState.rt.bids=hostState.rt.bids||{}; hostState.rt.bids[player.id]=data.bid; logHostEvent(`${player.name} сделал ставку.`,"text-zinc-500"); broadcastStateToPlayers(); updateHostUI(); }
+  else if(data.type==="SUBMIT_BID_ANSWER"){ hostState.rt.betAnswers=hostState.rt.betAnswers||{}; hostState.rt.betAnswers[player.id]={bid:data.bid,choice:data.choice}; logHostEvent(`${player.name} ответил на ставку.`,"text-zinc-500"); broadcastStateToPlayers(); updateHostUI(); }
+  updateHostUI();
+}
+
+function handleIncomingHostData(data){
+  if (!data) return;
+
+  /* Безопасное чтение таблицы очков */
+  if (data.scores) {
+    clientState.score = data.scores[clientState.name] || 0;
+  } else {
+    clientState.score = 0;
+  }
+  clientState.myId = data.myPlayerId;
+
+  /* Безопасный вывод метаданных раунда во избежание сбоя JS-потока */
+  const curRound = data.currentRound || 1;
+  const rName = data.roundName || 'Раунд';
+  const rDesc = data.roundDesc || '';
+
+  document.getElementById('round-indicator-player').innerText=`Раунд ${curRound} из 15`;
+  document.getElementById('round-name-player').innerText=`Механика: ${rName}`;
+  document.getElementById('player-rules-title-text').innerText=rName.toUpperCase();
+  document.getElementById('player-round-rules-preview').innerText=rDesc;
+
+  /* Исправление переключения полноэкранного вердикта (синхронное переключение hidden и flex) */
+  const feedbackOverlay=document.getElementById('player-feedback-overlay');
+  if (feedbackOverlay) {
+    if(data.feedback && (data.feedback.affectsAll || data.feedback.player===clientState.name)){
+      feedbackOverlay.classList.remove('hidden');
+      feedbackOverlay.classList.add('flex', data.feedback.isCorrect?'bg-emerald-900':'bg-red-950','animate__fadeIn');
+      document.getElementById('player-feedback-icon').innerText=data.feedback.isCorrect?"✅":"❌";
+      document.getElementById('player-feedback-title').innerText=(data.feedback.isCorrect?"ВЕРНО!":"ОШИБКА!");
+    } else {
+      feedbackOverlay.classList.add('hidden');
+      feedbackOverlay.classList.remove('flex', 'bg-emerald-900', 'bg-red-950', 'animate__fadeIn');
+    }
+  }
+
+  /* Исправление переключения экрана темы */
+  const playerReveal = document.getElementById('player-reveal-stage');
+  if (playerReveal) {
+    if (data.roundStage === 'reveal') {
+      playerReveal.classList.remove('hidden');
+      playerReveal.classList.add('flex');
+      const revealTheme = data.theme || 'Свободная тема';
+      document.getElementById('player-reveal-theme').innerText=revealTheme.toUpperCase();
+    } else {
+      playerReveal.classList.add('hidden');
+      playerReveal.classList.remove('flex');
+    }
+  }
+
+  /* Исправление переключения экрана подготовки ответа */
+  const playerAnnounce = document.getElementById('player-announcement-stage');
+  if (playerAnnounce) {
+    if (data.roundStage === 'announcement') {
+      playerAnnounce.classList.remove('hidden');
+      playerAnnounce.classList.add('flex');
+      const activeName = data.activePlayerName || 'Игрок';
+      document.getElementById('player-announcement-name').innerText=activeName.toUpperCase();
+    } else {
+      playerAnnounce.classList.add('hidden');
+      playerAnnounce.classList.remove('flex');
+    }
+  }
+
+  const podiumStage = document.getElementById('player-podium-stage');
+  if (podiumStage) {
+    podiumStage.classList.toggle('hidden', !data.gameOver);
+    if(data.gameOver && data.podium){
+      hideAllPlayerStages();
+      document.getElementById('player-podium-list').innerHTML = data.podium.map((p,idx)=>`
+        <div class="p-3 bg-zinc-950 border border-zinc-800 rounded-2xl flex justify-between items-center">
+          <span class="text-xs font-black uppercase text-zinc-500">${idx+1} место</span>
+          <span class="font-bold text-white">${p.name}</span>
+          <span class="neon-font text-yellow-300">${p.score} б.</span>
+        </div>`).join('');
+      return;
+    }
+  }
+
+  if(data.roundStage==='lobby' || data.roundStage==='rules' || data.roundStage==='reveal' || data.roundStage==='announcement'){
+    showControllerStage('player-ctrl-waiting');
+  } else if(data.roundStage==='play' || data.roundStage==='resolve'){
+    renderPlayerPlayStage(data);
+  }
+
+  const playerScoreboard=document.getElementById('player-scoreboard');
+  if(playerScoreboard && data.scores){
+    playerScoreboard.innerHTML=Object.keys(data.scores).map(name=>`
+      <div class="neon-shadow-cyan bg-zinc-950 p-3 text-center rounded-2xl">
+        <div class="text-[9px] font-black uppercase text-zinc-500 truncate">${name}</div>
+        <div class="neon-font text-xl text-yellow-300 tracking-tight mt-1">${data.scores[name]}</div>
+      </div>`).join('');
+  }
+}
+
+function hideAllPlayerStages(){
+  ['player-ctrl-waiting','player-ctrl-standby','player-ctrl-abcd','player-ctrl-special','player-ctrl-done'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+}
+function showControllerStage(stageId){
+  hideAllPlayerStages();
+  const el = document.getElementById(stageId);
+  if (el) el.classList.remove('hidden');
+}
+
+/* =========================================================================
+   ОТРИСОВКА ИГРОВОГО ИНТЕРФЕЙСА ИГРОКОВ (По раундам)
+========================================================================= */
+function renderPlayerPlayStage(data){
+  const type=data.roundType;
+  const iAmActive = data.activePlayerId===clientState.myId;
+  const rt=data.rt||{};
+
+  if(type==='union'){
+    renderPlayerMC(data, true, false);
+    return;
+  }
+  if(type==='oral'||type==='blackbox'||type==='survivor'){
+    showControllerStage('player-ctrl-special');
+    const box=document.getElementById('player-ctrl-special');
+    let extra='';
+    if(type==='blackbox' && iAmActive && !rt.buzzed){
+      extra = `<button onclick="sendToHost({type:'BUZZ'})" class="w-full bg-pink-600 hover:bg-pink-500 text-white font-black py-5 rounded-2xl border-b-8 border-pink-900 uppercase text-sm">🔔 Отвечаю сейчас!</button>`;
+    }
+
+    /* РАУНД 8: Под подсказками черного ящика на экранах игроков отображаются активные подсказки */
+    let revealedCluesHtml = '';
+    if (type === 'blackbox') {
+      const revealedClues = (data.clues || []).map((c, idx) => `
+        <div class="p-2 text-left rounded-lg text-xs ${idx <= (rt.clueIdx || 0) ? 'bg-zinc-800 text-white border border-zinc-700' : 'bg-zinc-950/50 text-zinc-700 border border-zinc-900/30'}">
+          ${idx + 1}. ${idx <= (rt.clueIdx || 0) ? c : '❓ ???'}
+        </div>`).join('');
+      revealedCluesHtml = `<div class="space-y-1.5 max-w-xs mx-auto my-3">${revealedClues}</div>`;
+    }
+
+    box.innerHTML = `
+      <div class="text-center space-y-3">
+        <span class="text-4xl inline-block">${type==='blackbox'?'📦':(type==='survivor'?'💀':'⚡')}</span>
+        <h4 class="neon-font text-base text-cyan-400 uppercase">${iAmActive?'Отвечайте вслух ведущему!':'Слушайте ведущего...'}</h4>
+        <p class="text-xs text-zinc-400 font-bold px-4">${data.questionText||''}</p>
+        ${revealedCluesHtml}
+        ${extra}
+      </div>`;
+    return;
+  }
+  if(type==='auction'){
+    showControllerStage('player-ctrl-special');
+    const box=document.getElementById('player-ctrl-special');
+    const myBid=(rt.bids&&rt.bids[clientState.myId]!==undefined)?rt.bids[clientState.myId]:'';
+
+    if(rt.stage==='bidding'){
+      if (myBid !== '') {
+        /* РАУНД 9: Блокировка кнопки и поля ставки после успешной отправки */
+        box.innerHTML=`
+          <div class="text-center space-y-3">
+            <span class="text-4xl inline-block">🎰</span>
+            <h4 class="neon-font text-base text-yellow-300 uppercase">Тема: ${data.theme}</h4>
+            <p class="text-[10px] text-zinc-500 uppercase font-black">Баланс: ${clientState.score}</p>
+            <div class="flex gap-2 max-w-xs mx-auto opacity-50">
+              <input disabled type="number" class="flex-grow bg-zinc-950 border border-zinc-900 rounded-xl p-3 text-center text-zinc-600 font-bold" value="${myBid}">
+              <button disabled class="bg-zinc-800 text-zinc-500 font-black px-4 rounded-xl uppercase text-xs">OK</button>
+            </div>
+            <p class="text-xs text-emerald-400 font-bold">Ваша ставка ${myBid} б. принята и заблокирована!</p>
+          </div>`;
+      } else {
+        box.innerHTML=`
+          <div class="text-center space-y-3">
+            <span class="text-4xl inline-block">🎰</span>
+            <h4 class="neon-font text-base text-yellow-300 uppercase">Тема: ${data.theme}</h4>
+            <p class="text-[10px] text-zinc-400 uppercase">Баланс: ${clientState.score}</p>
+            <div class="flex gap-2 max-w-xs mx-auto">
+              <input id="auction-bid-input" type="number" min="1" max="${clientState.score}" placeholder="Ставка" class="flex-grow bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center text-white font-bold" value="${myBid}">
+              <button onclick="sendBid()" class="bg-cyan-500 text-black font-black px-4 rounded-xl uppercase text-xs">OK</button>
+            </div>
+          </div>`;
+      }
+    } else {
+      renderPlayerMC(data, false, iAmActive);
+    }
+    return;
+  }
+  if(type==='blind'){
+    if(rt.stage==='choose_category'){
+      showControllerStage('player-ctrl-special');
+      const box=document.getElementById('player-ctrl-special');
+      if(iAmActive){
+        /* Фикс уязвимости и сбоев includes на неопределенных массивах */
+        box.innerHTML = `<div class="text-center space-y-3"><h4 class="neon-font text-sm text-cyan-400 uppercase">Выберите тему</h4>
+        <div class="grid grid-cols-2 gap-2">${(rt.categories||[]).map((c,idx)=>`<button ${(rt.usedCats && Array.isArray(rt.usedCats) && rt.usedCats.includes(idx))?'disabled':''} onclick="sendToHost({type:'SELECT_CATEGORY',catIndex:${idx}})" class="pill-btn bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 px-2 rounded-xl border-b-4 border-indigo-900">${c}</button>`).join('')}</div></div>`;
+      } else {
+        /* РАУНД 2: Ждущие игроки видят список доступных категорий, а не просто пустой экран */
+        const topicsList = (rt.categories || []).map((c, idx) => `
+          <div class="p-2.5 rounded-xl text-xs font-semibold ${rt.usedCats && rt.usedCats.includes(idx) ? 'bg-zinc-950/40 text-zinc-700 border border-zinc-900/30 line-through' : 'bg-zinc-900 border border-zinc-800 text-zinc-300'}">
+            ${c}
+          </div>`).join('');
+        box.innerHTML=`
+          <div class="text-center space-y-4">
+            <h4 class="neon-font text-xs text-zinc-400 uppercase animate-pulse">Ожидаем выбор темы от ${data.activePlayerName}...</h4>
+            <div class="text-[9px] text-zinc-500 uppercase tracking-widest font-black text-left max-w-xs mx-auto">Доступные категории:</div>
+            <div class="grid grid-cols-2 gap-2 max-w-xs mx-auto text-left">
+              ${topicsList}
+            </div>
+          </div>`;
+      }
+    } else {
+      renderPlayerMC(data, false, iAmActive);
+    }
+    return;
+  }
+  if(type==='order'){
+    if(iAmActive && !(data.hasAnswered && Array.isArray(data.hasAnswered) && data.hasAnswered.includes(clientState.name))){
+      showControllerStage('player-ctrl-special');
+      const box=document.getElementById('player-ctrl-special');
+      box.innerHTML=`<div class="space-y-3 text-center">
+        <h4 class="neon-font text-base text-zinc-100 uppercase px-2">${data.questionText}</h4>
+        <p class="text-[10px] text-zinc-500 uppercase">Кликайте в правильном порядке</p>
+        <div id="order-pool" class="grid grid-cols-2 gap-2">${data.options.map((o,idx)=>`<button data-idx="${idx}" onclick="orderPick(${idx})" class="order-opt pill-btn bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold py-3 px-2 rounded-xl border-b-4 border-zinc-950">${o}</button>`).join('')}</div>
+        <div id="order-picked" class="flex justify-center gap-2 pt-2 text-yellow-300 font-black text-lg"></div>
+        <button onclick="orderSubmit()" class="hidden w-full bg-emerald-600 text-white font-black py-3 rounded-xl uppercase text-xs" id="order-submit-btn">Подтвердить</button>
+      </div>`;
+      window.__orderPicked=[];
+    } else if(iAmActive){
+      showControllerStage('player-ctrl-done');
+    } else {
+      showControllerStage('player-ctrl-standby');
+      document.getElementById('player-active-turn-indicator').innerText=`Отвечает: ${(data.activePlayerName||'').toUpperCase()}`;
+      document.getElementById('player-standby-question-text').innerText=data.questionText||'';
+      document.getElementById('player-standby-answers-preview').innerHTML=(data.options||[]).map(o=>`<div class="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-left text-[11px] font-bold text-zinc-400">${o}</div>`).join('');
+    }
+    return;
+  }
+  if(type==='sabotage'){
+    if(rt.awaitingTarget && iAmActive){
+      showControllerStage('player-ctrl-special');
+      const others=data.playersList.filter(p=>p.name!==clientState.name);
+      document.getElementById('player-ctrl-special').innerHTML=`<div class="text-center space-y-3">
+        <h4 class="neon-font text-sm text-emerald-400 uppercase">Вы ответили верно! Заберите балл:</h4>
+        <div class="grid grid-cols-2 gap-2">${others.map(p=>`<button onclick="sendToHost({type:'SELECT_TARGET',targetId:${p.id}})" class="bg-red-600 hover:bg-red-500 text-white text-xs font-bold py-3 rounded-xl border-b-4 border-red-900">${p.name} (${p.score})</button>`).join('')}</div>
+      </div>`;
+      return;
+    }
+    renderPlayerMC(data, false, iAmActive);
+    return;
+  }
+  if(type==='snowball'){
+    if(rt.awaitingDecision && iAmActive){
+      showControllerStage('player-ctrl-special');
+      document.getElementById('player-ctrl-special').innerHTML=`<div class="text-center space-y-3">
+        <h4 class="neon-font text-sm text-yellow-300 uppercase">Верно! Набрано баллов: ${rt.bankedPoints}</h4>
+        <p class="text-[10px] text-zinc-400">Забрать или рискнуть ради следующей ступени?</p>
+        <div class="flex gap-2 justify-center">
+          <button onclick="sendToHost({type:'CONTINUE_OR_BANK',decision:'bank'})" class="bg-emerald-600 text-white font-black px-5 py-3 rounded-xl uppercase text-xs">Забрать</button>
+          <button onclick="sendToHost({type:'CONTINUE_OR_BANK',decision:'continue'})" class="bg-pink-600 text-white font-black px-5 py-3 rounded-xl uppercase text-xs">Рискнуть</button>
+        </div>
+      </div>`;
+      return;
+    }
+    renderPlayerMC(data, false, iAmActive);
+    return;
+  }
+  if(type==='veto'){
+    renderVetoPlayer(data, rt, iAmActive);
+    return;
+  }
+  renderPlayerMC(data, false, iAmActive);
+}
+
+function renderPlayerMC(data, everyoneCanAnswer, iAmActive){
+  const active = everyoneCanAnswer ? true : iAmActive;
+  const hasAnswered = data.hasAnswered || [];
+
+  if(active && !hasAnswered.includes(clientState.name)){
+    showControllerStage('player-ctrl-abcd');
+    const qWrapper=document.getElementById('player-active-question-wrapper');
+    const bGrid=document.getElementById('player-buttons-grid');
+    document.getElementById('player-question-display').innerText=data.questionText||'';
+    
+    if(data.showOptions){
+      qWrapper.className="player-question-box active text-center w-full";
+      bGrid.className="player-options-box visible grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto pt-4";
+      bGrid.innerHTML='';
+      (data.options||[]).forEach((opt,idx)=>{
+        const btn=document.createElement('button');
+        btn.className=`w-full text-left font-bold py-4 px-5 rounded-2xl border-b-4 transition-all text-xs flex items-center gap-3 animate__animated animate__fadeInUp ${idx===0?'bg-pink-600 active:bg-pink-500 text-white border-pink-900':idx===1?'bg-cyan-500 active:bg-cyan-400 text-black border-cyan-800':idx===2?'bg-yellow-400 active:bg-yellow-300 text-black border-yellow-700':'bg-indigo-600 active:bg-indigo-500 text-white border-indigo-900'}`;
+        btn.style.animationDelay = `${idx * 0.1}s`;
+        btn.innerHTML=`<span class="bg-black/20 px-2 py-0.5 rounded text-[10px] font-black">${String.fromCharCode(1040+idx)}</span> <span class="flex-grow text-left">${opt}</span>`;
+        btn.onclick=()=>submitPlayerChoice(idx);
+        bGrid.appendChild(btn);
+      });
+    } else {
+      qWrapper.className="player-question-box centered text-center w-full";
+      bGrid.className="player-options-box grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto pt-4";
+      bGrid.innerHTML='';
+    }
+  } else if(active){
+    showControllerStage('player-ctrl-done');
+  } else {
+    showControllerStage('player-ctrl-standby');
+    document.getElementById('player-active-turn-indicator').innerText=`Отвечает: ${(data.activePlayerName||'').toUpperCase()}`;
+    const qWrapperStandby=document.getElementById('player-standby-question-wrapper');
+    const previewGrid=document.getElementById('player-standby-answers-preview');
+    document.getElementById('player-standby-question-text').innerText=data.questionText||'';
+    
+    if(data.showOptions){
+      qWrapperStandby.className="player-question-box active text-center w-full";
+      previewGrid.className="player-options-box visible grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto pt-4";
+      previewGrid.innerHTML=(data.options||[]).map((ans,idx)=>{
+        let cardClass="bg-zinc-950 border border-zinc-800 text-zinc-400";
+        if(data.feedback && data.feedback.correctAnswerIdx!==undefined){
+          const correctChoice=idx===data.feedback.correctAnswerIdx;
+          const selectedByActive=idx===data.feedback.choice;
+          if(correctChoice) cardClass="bg-emerald-600 border-4 border-emerald-400 text-white shadow-lg";
+          else if(selectedByActive) cardClass="bg-red-950 border-2 border-red-500 text-red-400";
+          else cardClass="bg-zinc-950 border border-zinc-900 text-zinc-600 line-through";
+        }
+        return `<div class="p-3 rounded-xl text-left text-[11px] font-bold flex items-center gap-3 ${cardClass}"><span class="neon-font text-pink-500">${String.fromCharCode(1040+idx)}:</span> <span class="text-left flex-grow">${ans}</span></div>`;
+      }).join('');
+    } else {
+      qWrapperStandby.className="player-question-box centered text-center w-full";
+      previewGrid.className="player-options-box grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto pt-4";
+      previewGrid.innerHTML='';
+    }
+  }
+}
+
+function renderVetoPlayer(data, rt, iAmActive){
+  showControllerStage('player-ctrl-special');
+  const box=document.getElementById('player-ctrl-special');
+  const vetoed = rt.vetoed || [];
+
+  if(rt.phase==='veto'){
+    const cats=rt.categories||[];
+    box.innerHTML=`<div class="text-center space-y-3">
+      <h4 class="neon-font text-sm text-red-400 uppercase">${iAmActive?'Вычеркните лишнюю тему!':'Вето накладывает: '+data.activePlayerName}</h4>
+      <div class="grid grid-cols-2 gap-2">${cats.map((c,idx)=>(vetoed && Array.isArray(vetoed) && vetoed.includes(idx))?`<div class="bg-zinc-900 text-zinc-700 text-xs font-bold py-3 px-2 rounded-xl line-through">${c.name}</div>`:`<button ${iAmActive?'':'disabled'} onclick="sendToHost({type:'VETO_CATEGORY',catIndex:${idx}})" class="pill-btn bg-red-600 hover:bg-red-500 text-white text-xs font-bold py-3 px-2 rounded-xl border-b-4 border-red-900">${c.name}</button>`).join('')}</div>
+    </div>`;
+  } else if(rt.phase==='choose'){
+    const cats=rt.categories||[];
+    const canPick = rt.pickOrder && rt.pickOrder[rt.pickTurn]===clientState.myId;
+    box.innerHTML=`<div class="text-center space-y-3">
+      <h4 class="neon-font text-sm text-cyan-400 uppercase">${canPick?'Заберите свою тему!':'Ждем выбор темы: '+(rt.pickOrderNames?rt.pickOrderNames[rt.pickTurn]:'')}</h4>
+      <div class="grid grid-cols-2 gap-2">${cats.map((c,idx)=>(vetoed && Array.isArray(vetoed) && vetoed.includes(idx))?'':(rt.chosen[idx]!==undefined?`<div class="bg-zinc-900 text-zinc-500 text-xs font-bold py-3 px-2 rounded-xl">${c.name} → ${rt.chosen[idx]}</div>`:`<button ${canPick?'':'disabled'} onclick="sendToHost({type:'SELECT_CATEGORY',catIndex:${idx}})" class="pill-btn bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold py-3 px-2 rounded-xl border-b-4 border-cyan-800">${c.name}</button>`)).join('')}</div>
+    </div>`;
+  } else if(rt.phase==='bet_answer'){
+    const myCatIdx=Object.keys(rt.chosen||{}).find(k=>rt.chosen[k]===clientState.name);
+    const already = rt.betAnswers && rt.betAnswers[clientState.myId];
+    if(myCatIdx===undefined){ box.innerHTML=`<div class="text-center text-xs text-zinc-500 uppercase font-bold">Ожидание ставок...</div>`; return; }
+    const cat=rt.categories[myCatIdx];
+    if(already){ box.innerHTML=`<div class="text-center space-y-2"><h4 class="neon-font text-sm text-emerald-400 uppercase">Принято: ${already.bid}б.</h4><p class="text-[10px] text-zinc-500">Ждем соперников...</p></div>`; return; }
+    box.innerHTML=`<div class="space-y-3 text-center">
+      <h4 class="neon-font text-sm text-yellow-300 uppercase">${cat.name}</h4>
+      <p class="text-xs font-bold text-zinc-100 px-2 text-left">${cat.q}</p>
+      <div class="grid grid-cols-2 gap-2 text-left" id="veto-bet-options">${cat.a.map((o,idx)=>`<button data-idx="${idx}" onclick="vetoSelectOption(${idx})" class="veto-opt pill-btn bg-zinc-800 text-white text-xs font-bold py-3 px-2 rounded-xl border-b-4 border-zinc-950 text-left flex gap-2 items-center"><span class="bg-black/20 px-2 py-0.5 rounded text-[10px]">${String.fromCharCode(1040+idx)}</span><span class="flex-grow">${o}</span></button>`).join('')}</div>
+      <div class="flex gap-2 justify-center items-center pt-2">
+        <input id="veto-bid-input" type="number" min="1" max="${clientState.score}" placeholder="Ставка (макс ${clientState.score})" class="bg-zinc-900 border border-zinc-800 rounded-xl p-2 text-center text-white font-bold w-32 text-xs">
+        <button onclick="vetoSubmitBet()" class="bg-emerald-600 text-white font-black px-4 py-2 rounded-xl uppercase text-xs">Ва-банк</button>
+      </div>
+      <button onclick="vetoSubmitFinal()" class="w-full bg-pink-600 text-white font-black py-3 rounded-xl uppercase text-xs">Отправить ставку и ответ</button>
+    </div>`;
+    window.__vetoChoice = window.__vetoChoice ?? null;
+  }
+}
+function vetoSelectOption(idx){
+  window.__vetoChoice=idx;
+  document.querySelectorAll('.veto-opt').forEach(b=>b.classList.remove('bg-cyan-500','text-black'));
+  document.querySelectorAll('.veto-opt')[idx].classList.add('bg-cyan-500','text-black');
+}
+function vetoSubmitBet(){ document.getElementById('veto-bid-input').value=clientState.score; }
+function vetoSubmitFinal(){
+  const bid=parseInt(document.getElementById('veto-bid-input').value,10);
+  if(!bid||bid<1||bid>clientState.score){ alert("Диапазон ставки: от 1 до "+clientState.score); return; }
+  if(window.__vetoChoice===null||window.__vetoChoice===undefined){ alert("Кликните на вариант!"); return; }
+  sendToHost({type:'SUBMIT_BID_ANSWER',bid:bid,choice:window.__vetoChoice});
+}
+
+function orderPick(idx){
+  const btn=document.querySelector(`.order-opt[data-idx="${idx}"]`);
+  if(btn.disabled) return;
+  window.__orderPicked.push(idx);
+  btn.disabled=true; btn.classList.add('opacity-30');
+  document.getElementById('order-picked').innerHTML=window.__orderPicked.map((i,n)=>`<span>${n+1}️⃣${String.fromCharCode(1040+i)}</span>`).join(' ');
+  if(window.__orderPicked.length===4){ document.getElementById('order-submit-btn').classList.remove('hidden'); }
+}
+function orderSubmit(){ sendToHost({type:'SUBMIT_ORDER',order:window.__orderPicked}); showControllerStage('player-ctrl-done'); }
+function sendBid(){
+  const v=parseInt(document.getElementById('auction-bid-input').value,10);
+  if(!v||v<1||v>clientState.score){ alert("Макс ставка: "+clientState.score); return; }
+  sendToHost({type:'SUBMIT_BID',bid:v});
+}
+function submitPlayerChoice(choiceIdx){ sendToHost({type:'SUBMIT_ANSWER',choice:choiceIdx}); showControllerStage('player-ctrl-done'); }
+function sendToHost(msg){ if(clientState.conn && clientState.conn.open) clientState.conn.send(msg); }
+
+/* =========================================================================
+   ИМПОРТ И ПАРСИНГ JSON ОТ ИИ
+========================================================================= */
+function loadRoundDataFromText(rawText){
+  try{
+    let cleaned=rawText.trim();
+    cleaned=cleaned.replace(/^```(?:json)?/,"").replace(/```$/,"").trim();
+    const firstBrace=cleaned.indexOf('{'); const lastBrace=cleaned.lastIndexOf('}');
+    if(firstBrace!==-1&&lastBrace!==-1) cleaned=cleaned.substring(firstBrace,lastBrace+1);
+    const parsed=JSON.parse(cleaned);
+
+    const normalizeQ=(q)=>{
+      if(q.question&&!q.q) q.q=q.question;
+      if(q.answers&&!q.a) q.a=q.answers;
+      if(q.choices&&!q.a) q.a=q.choices;
+      if(q.correctAnswer!==undefined&&q.c===undefined) q.c=q.correctAnswer;
+      if(q.correct!==undefined&&q.c===undefined) q.c=q.correct;
+      if(q.category && typeof q.category === 'string') {}
+      else if(q.theme && typeof q.theme === 'string') q.category = q.theme;
+      else q.category = "Категория";
+      return q;
+    };
+    if(parsed.questions) parsed.questions.forEach(q=>{ normalizeQ(q); if(q.chain) q.chain.forEach(normalizeQ); });
+    if(parsed.categories) parsed.categories.forEach(normalizeQ);
+
+    hostState.roundQuestions=parsed;
+    hostState.activeQuestionIdx=0;
+    hostState.activePlayerIdx=0;
+    hostState.answersReceived={};
+    hostState.rt={};
+    hostState.theme = document.getElementById('config-field-theme')?.value || 'Свободная тема';
+    document.getElementById('host-ai-textarea').value="";
+
+    initRoundRuntime();
+    logHostEvent("JSON принят! Раунд подготовлен.","text-emerald-400 font-bold");
+    runRevealThemeTransition();
+  }catch(e){
+    alert("Критическая ошибка разбора JSON! Убедитесь в корректности выданной структуры ИИ.");
+    logHostEvent(`Сбой обработки: ${e.message}`,"text-red-500");
+  }
+}
+function parseManualJSON(){ const raw=document.getElementById('host-ai-textarea').value.trim(); loadRoundDataFromText(raw); }
+
+function initRoundRuntime(){
+  const type=roundType(hostState.currentRound);
+  const rq=hostState.roundQuestions;
+  hostState.rt={};
+  if(type==='blind'){
+    hostState.rt.stage='choose_category';
+    const qs = rq.questions || [];
+    hostState.rt.categories = qs.map((q, idx) => q.category || `Тема ${idx + 1}`);
+    if(hostState.rt.categories.length === 0) {
+      hostState.rt.categories = ["Тема А", "Тема Б", "Тема В", "Тема Г"];
+    }
+    hostState.rt.usedCats=[];
+  }
+  if(type==='carousel'){ hostState.rt.bank=0; }
+  if(type==='survivor'){ hostState.players.forEach(p=>p.alive=true); hostState.rt.aliveCount=hostState.players.length; }
+  if(type==='blackbox'){ hostState.rt.clueIdx=0; hostState.rt.buzzed=false; }
+  if(type==='auction'){ hostState.rt.stage='bidding'; hostState.rt.bids={}; }
+  if(type==='snowball'){ hostState.rt.chainIdx=0; hostState.rt.bankedPoints=0; hostState.rt.awaitingDecision=false; }
+  if(type==='veto'){
+    const cats=rq.categories||[];
+    hostState.rt.phase='veto';
+    hostState.rt.categories=cats;
+    if (cats.length === 0) {
+      const fallbackCats = ["Космос", "Технологии", "Кино", "Мифы", "Еда", "Музыка", "Игры", "География"];
+      hostState.rt.categories = fallbackCats.map((name) => ({
+        name: name,
+        q: `Вопрос по теме ${name}`,
+        a: ["Вариант А", "Вариант Б", "Вариант В", "Вариант Г"],
+        c: 0
+      }));
+    }
+    hostState.rt.vetoed=[];
+    hostState.rt.chosen={};
+    hostState.rt.betAnswers={};
+    const leader=getLeader();
+    const startIdx=leader?hostState.players.findIndex(p=>p.id===leader.id):0;
+    hostState.rt.vetoTurn = startIdx<0?0:startIdx;
+    hostState.rt.vetoesNeeded = hostState.rt.categories.length - hostState.players.length;
+    hostState.rt.vetoesDone=0;
+  }
+}
+
+/* =========================================================================
+   ИГРОВОЙ ЦИКЛ: ПЕРЕХОДЫ И ТАЙМЕРЫ
+========================================================================= */
+function runRevealThemeTransition(){
+  hostState.roundStage='reveal';
+  broadcastStateToPlayers(); updateHostUI();
+  setTimeout(()=>{ beginRoundPlayPhase(); },3500);
+}
+
+function beginRoundPlayPhase(){
+  const type=roundType(hostState.currentRound);
+  if(type==='auction'){ hostState.roundStage='play'; hostState.rt.stage='bidding'; broadcastStateToPlayers(); updateHostUI(); return; }
+  if(type==='union'){ hostState.roundStage='play'; hostState.showOptions=true; broadcastStateToPlayers(); updateHostUI(); return; }
+  if(type==='veto'){ hostState.roundStage='play'; broadcastStateToPlayers(); updateHostUI(); return; }
+  runPlayerAnnouncement();
+}
+
+function pickActivePlayerForType(){
+  const type=roundType(hostState.currentRound);
+  if(type==='king'){
+    const leader=getLeader();
+    return leader?hostState.players.findIndex(p=>p.id===leader.id):0;
+  }
+  return hostState.activePlayerIdx;
+}
+
+function runPlayerAnnouncement(){
+  hostState.activePlayerIdx=pickActivePlayerForType();
+  hostState.roundStage='announcement';
+  const activePlayer=hostState.players[hostState.activePlayerIdx];
+  if(!activePlayer) return;
+
+  const type=roundType(hostState.currentRound);
+  /* РАУНД 12: Быстрый темп для раунда Выживания */
+  const announceDelay = (type === 'survivor') ? 1200 : 2500;
+
+  document.getElementById('tv-player-announcement-stage').classList.remove('hidden');
+  document.getElementById('tv-player-announcement-name').innerText=activePlayer.name.toUpperCase();
+  broadcastStateToPlayers(); updateHostUI();
+
+  setTimeout(()=>{
+    document.getElementById('tv-player-announcement-stage').classList.add('hidden');
+    hostState.roundStage='play';
+    hostState.showOptions=false;
+    if(type==='blind') hostState.rt.stage='choose_category';
+    broadcastStateToPlayers(); updateHostUI();
+
+    if(type!=='blind' && type!=='oral' && type!=='blackbox' && type!=='survivor'){
+      setTimeout(()=>{ hostState.showOptions=true; broadcastStateToPlayers(); updateHostUI(); }, 4000); 
+    }
+    if(type==='oral') startOralTimer(45);
+    if(type==='survivor') startOralTimer(5);
+  }, announceDelay);
+}
+
+function startOralTimer(seconds){
+  clearInterval(countdownTimer);
+  hostState.rt.timeLeft=seconds;
+  broadcastStateToPlayers(); updateHostUI();
+  countdownTimer=setInterval(()=>{
+    hostState.rt.timeLeft--;
+    updateHostUI();
+    if(hostState.rt.timeLeft<=0){
+      clearInterval(countdownTimer);
+      const type = roundType(hostState.currentRound);
+      if(type==='survivor') survivorJudge(false);
+      /* РАУНД 7: Автоматическое завершение хода игрока при окончании 45 секунд таймера */
+      if(type==='oral') oralFinishTurn();
+    }
+  },1000);
+}
+
+/* =========================================================================
+   ОБРАБОТКА ПОЛУЧЕННЫХ ОТВЕТОВ И ОЧКОВ
+========================================================================= */
+function onAnswerLikeSubmitted(player){
+  const type=roundType(hostState.currentRound);
+  const activePlayer=hostState.players[hostState.activePlayerIdx];
+
+  if(type==='union'){
+    if(hostState.roundStage!=='play') return;
+    const qData=hostState.roundQuestions.questions[0];
+    const choice=hostState.answersReceived[player.id];
+    const isCorrect=choice===qData.c;
+    hostState.players.forEach(p=>changeScore(p, isCorrect?1:-2));
+    logHostEvent(`Коллективный ответ ${isCorrect?'ВЕРНЫЙ (+1 всем)':'ОШИБОЧНЫЙ (−2 всем)'}`, isCorrect?"text-emerald-400":"text-red-400");
+    triggerVerdictOverlay('Команда',isCorrect,choice,qData.c,true);
+    hostState.answersReceived={};
+    return;
+  }
+
+  if(!activePlayer || player.id!==activePlayer.id) return;
+
+  if(type==='order'){
+    const qData=hostState.roundQuestions.questions[hostState.activeQuestionIdx];
+    const order=hostState.answersReceived[player.id];
+    const isCorrect = Array.isArray(order) && order.length===4 && order.every((v,i)=>v===i);
+    if(isCorrect) changeScore(activePlayer,2);
+    logHostEvent(`${activePlayer.name} ${isCorrect?'порядок собрал (+2)':'ошибся в сортировке (0)'}`, isCorrect?"text-emerald-400":"text-zinc-500");
+    revealOrderOnTV(qData, order, isCorrect);
+    return;
+  }
+
+  if(type==='snowball'){
+    const chain=hostState.roundQuestions.questions[hostState.activeQuestionIdx].chain;
+    const qData=chain[hostState.rt.chainIdx];
+    const choice=hostState.answersReceived[player.id];
+    const isCorrect=choice===qData.c;
+    if(!isCorrect){
+      hostState.rt.bankedPoints=0;
+      logHostEvent(`${activePlayer.name} ошибся в цепочке — раунд обнулен`,"text-red-400");
+      triggerVerdictOverlay(activePlayer.name,false,choice,qData.c);
+      hostState.rt.chainDone=true;
+      return;
+    }
+    hostState.rt.bankedPoints=hostState.rt.chainIdx+1;
+    logHostEvent(`${activePlayer.name} ответил верно! Накоплено: ${hostState.rt.bankedPoints}`,"text-emerald-400");
+    if(hostState.rt.chainIdx>=2){
+      changeScore(activePlayer,hostState.rt.bankedPoints);
+      triggerVerdictOverlay(activePlayer.name,true,choice,qData.c);
+      hostState.rt.chainDone=true;
+    } else {
+      hostState.rt.awaitingDecision=true;
+      triggerVerdictOverlay(activePlayer.name,true,choice,qData.c);
+    }
+    return;
+  }
+
+  if(type==='auction'){
+    const qData=hostState.roundQuestions.questions[0];
+    const choice=hostState.answersReceived[player.id];
+    const isCorrect=choice===qData.c;
+    const bid=hostState.rt.winningBid||1;
+    changeScore(activePlayer, isCorrect?bid:-bid);
+    logHostEvent(`${activePlayer.name} разыграл лот ${isCorrect?'ВЕРНО (+':'НЕВЕРНО (-'}${bid}б.)`, isCorrect?"text-emerald-400":"text-red-400");
+    triggerVerdictOverlay(activePlayer.name,isCorrect,choice,qData.c);
+    return;
+  }
+
+  const qData = getCurrentQuestionData();
+  const choice=hostState.answersReceived[player.id];
+  const isCorrect=choice===qData.c;
+  let delta=0;
+  if(type==='classic') delta = isCorrect?1:0;
+  else if(type==='classic2') delta = isCorrect?2:0;
+  else if(type==='mine') delta = isCorrect?2:(choice===qData.mine?-2:0);
+  else if(type==='king'){
+    if(isCorrect){ delta=1; } else { delta=-1; hostState.players.forEach(p=>{ if(p.id!==activePlayer.id) changeScore(p,1); }); }
+  }
+  else if(type==='sabotage') delta = 0; 
+  else if(type==='blind'){
+    const val=hostState.rt.currentValue||1;
+    delta = isCorrect?val:0;
+  }
+  else if(type==='carousel'){
+    if(isCorrect){ hostState.rt.bank=(hostState.rt.bank||0)+1; }
+    else { changeScore(activePlayer, hostState.rt.bank||0); hostState.rt.bankAwarded=true; }
+  }
+  if(type!=='carousel' && type!=='sabotage') changeScore(activePlayer, delta);
+  logHostEvent(`${activePlayer.name} ответил ${isCorrect?'верно':'неверно'} (${type})`, isCorrect?"text-emerald-400":"text-zinc-500");
+
+  if(type==='sabotage' && isCorrect){
+    hostState.rt.awaitingTarget=true;
+    triggerVerdictOverlay(activePlayer.name,true,choice,qData.c);
+    return;
+  }
+  triggerVerdictOverlay(activePlayer.name,isCorrect,choice,qData.c);
+}
+
+function getCurrentQuestionData(){
+  const type=roundType(hostState.currentRound);
+  if(!hostState.roundQuestions || !hostState.roundQuestions.questions) return null;
+  const mainQ = hostState.roundQuestions.questions[hostState.activeQuestionIdx];
+  if(!mainQ) return null;
+
+  if(type==='blind') {
+    return hostState.roundQuestions.questions[hostState.rt.activeQIdx];
+  }
+  /* РАУНД 10: Исправление ошибки Undefined во время трансляции подвопросов */
+  if(type==='snowball') {
+    const chainIdx = hostState.rt.chainIdx || 0;
+    if(mainQ.chain && mainQ.chain[chainIdx]) {
+      return mainQ.chain[chainIdx];
+    }
+  }
+  return mainQ;
+}
+
+function revealOrderOnTV(qData,order,isCorrect){
+  const previewGrid=document.getElementById('tv-answers-preview');
+  previewGrid.innerHTML=qData.a.map((ans,idx)=>{
+    const pos=Array.isArray(order)?order.indexOf(idx):-1;
+    return `<div class="p-4 rounded-2xl text-left text-xs font-bold flex items-center transition-all ${isCorrect?'bg-emerald-600 border-4 border-emerald-400 text-white':'bg-zinc-950 border border-zinc-800 text-zinc-400'}">
+      <span class="neon-font text-white mr-3">${pos>=0?pos+1:'?'}.</span> ${ans}</div>`;
+  }).join('');
+  triggerVerdictOverlay(hostState.players[hostState.activePlayerIdx].name,isCorrect,null,undefined);
+}
+
+/* =========================================================================
+   ПОКАЗ РЕЗУЛЬТАТОВ И ПЕРЕХОДЫ
+========================================================================= */
+function triggerVerdictOverlay(playerName,isCorrect,choice,correctAnswerIdx,affectsAll){
+  const tvOverlay=document.getElementById('tv-feedback-overlay');
+  tvOverlay.classList.remove('hidden');
+  tvOverlay.classList.add('flex', isCorrect?'bg-emerald-900':'bg-[#29020d]','animate__fadeIn');
+  document.getElementById('tv-feedback-icon').innerText=isCorrect?"✅":"❌";
+  document.getElementById('tv-feedback-title').innerText=isCorrect?`${playerName}: ВЕРНО!`:`${playerName}: ОШИБКА!`;
+  document.getElementById('tv-feedback-sub').innerText='';
+
+  hostState.feedbackData={player:playerName,isCorrect:isCorrect,choice:choice,correctAnswerIdx:correctAnswerIdx,affectsAll:!!affectsAll};
+  broadcastStateToPlayers();
+  updateHostUI();
+
+  setTimeout(()=>{
+    tvOverlay.classList.add('hidden');
+    tvOverlay.classList.remove('flex', 'bg-emerald-900', 'bg-[#29020d]', 'animate__fadeIn');
+    hostState.feedbackData=null;
+    advanceAfterVerdict();
+  },3000);
+}
+
+function advanceAfterVerdict(){
+  const type=roundType(hostState.currentRound);
+  hostState.answersReceived={};
+
+  if(type==='snowball' && !hostState.rt.chainDone){
+    broadcastStateToPlayers(); updateHostUI();
+    return;
+  }
+  if(type==='sabotage' && hostState.rt.awaitingTarget){
+    broadcastStateToPlayers(); updateHostUI();
+    return;
+  }
+
+  /* РАУНД 5: Ограничение Короля горы строго одним вопросом */
+  if (type === 'king') {
+    finishRoundAndAdvance();
+    return;
+  }
+
+  hostState.activeQuestionIdx+=1;
+  const totalQ=(hostState.roundQuestions.questions||[]).length;
+
+  if(type==='carousel'){
+    if(hostState.rt.bankAwarded || hostState.activeQuestionIdx>=totalQ){ finishRoundAndAdvance(); return; }
+    hostState.activePlayerIdx=(hostState.activePlayerIdx+1)%hostState.players.length;
+    runPlayerAnnouncement();
+    return;
+  }
+
+  hostState.activePlayerIdx=(hostState.activePlayerIdx+1)%hostState.players.length;
+
+  if(type==='blind'){
+    if(hostState.rt.usedCats.length>=hostState.rt.categories.length || hostState.activeQuestionIdx>=totalQ){ finishRoundAndAdvance(); return; }
+    hostState.rt.stage='choose_category';
+    runPlayerAnnouncement();
+    return;
+  }
+
+  if(hostState.activeQuestionIdx<totalQ){
+    runPlayerAnnouncement();
+  } else {
+    finishRoundAndAdvance();
+  }
+}
+
+function finishRoundAndAdvance(){
+  hostState.feedbackData=null;
+  clearInterval(countdownTimer);
+
+  if(hostState.currentRound<15){
+    hostState.currentRound+=1;
+    hostState.roundStage='rules';
+    hostState.roundQuestions=null;
+    hostState.activeQuestionIdx=0;
+    hostState.activePlayerIdx=0;
+    hostState.answersReceived={};
+    hostState.rt={};
+    hostState.showOptions=false;
+    logHostEvent(`Переход к Раунду ${hostState.currentRound}. Сгенерируйте промпт.`,"text-yellow-400 font-bold");
+  } else {
+    showFinalVictoryPodium();
+  }
+  updateScoreboardAndControllers();
+}
+
+function hostSkipRound(){
+  if(!confirm("Скипнуть текущий раунд?")) return;
+  clearInterval(countdownTimer);
+  finishRoundAndAdvance();
+}
+
+/* =========================================================================
+   СВОЕОБРАЗНЫЕ ДЕЙСТВИЯ И МЕХАНИКИ
+========================================================================= */
+function handleSabotageTarget(player,targetId){
+  const target=hostState.players.find(p=>p.id===targetId);
+  if(!target) return;
+  changeScore(player,1);
+  changeScore(target,-1);
+  logHostEvent(`${player.name} изъял 1 балл у ${target.name}`,"text-pink-400 font-bold");
+  hostState.rt.awaitingTarget=false;
+  broadcastStateToPlayers(); updateHostUI();
+  advanceAfterVerdict();
+}
+
+function handleCategorySelect(player,catIndex){
+  const type=roundType(hostState.currentRound);
+  if(type==='blind'){
+    if(hostState.rt.usedCats.includes(catIndex)) return;
+    hostState.rt.usedCats.push(catIndex);
+    hostState.rt.activeQIdx=catIndex;
+    hostState.rt.currentValue=1+Math.floor(Math.random()*3);
+    hostState.rt.stage='reveal_value';
+    logHostEvent(`${player.name} выбрал тему. Ценность: ${hostState.rt.currentValue}б.`, "text-cyan-400 font-bold");
+    broadcastStateToPlayers(); updateHostUI();
+    setTimeout(()=>{ 
+      hostState.rt.stage='play'; hostState.showOptions=false; broadcastStateToPlayers(); updateHostUI();
+      setTimeout(()=>{ hostState.showOptions=true; broadcastStateToPlayers(); updateHostUI(); }, 4000);
+    },2000);
+    return;
+  }
+  if(type==='veto' && hostState.rt.phase==='choose'){
+    if(hostState.rt.vetoed.includes(catIndex) || hostState.rt.chosen[catIndex]!==undefined) return;
+    const expectedId=hostState.rt.pickOrder[hostState.rt.pickTurn];
+    if(player.id!==expectedId) return;
+    hostState.rt.chosen[catIndex]=player.name;
+    hostState.rt.chosenByPlayerId=hostState.rt.chosenByPlayerId||{};
+    hostState.rt.chosenByPlayerId[player.id]=catIndex;
+    logHostEvent(`${player.name} забрал себе тему "${hostState.rt.categories[catIndex].name}"`,"text-cyan-400 font-bold");
+    hostState.rt.pickTurn+=1;
+    if(hostState.rt.pickTurn>=hostState.rt.pickOrder.length){
+      hostState.rt.phase='bet_answer';
+      logHostEvent("Темы закреплены. Игроки делают скрытые ставки.","text-yellow-400 font-bold");
+    }
+    broadcastStateToPlayers(); updateHostUI();
+  }
+}
+
+function handleVeto(player,catIndex){
+  if(hostState.rt.phase!=='veto') return;
+  const expectedId=hostState.players[hostState.rt.vetoTurn % hostState.players.length].id;
+  if(player.id!==expectedId) return;
+  if(hostState.rt.vetoed.includes(catIndex)) return;
+  hostState.rt.vetoed.push(catIndex);
+  hostState.rt.vetoesDone+=1;
+  logHostEvent(`${player.name} убрал (вето) тему "${hostState.rt.categories[catIndex].name}"`,"text-red-400 font-bold");
+  hostState.rt.vetoTurn+=1;
+
+  if(hostState.rt.vetoesDone>=hostState.rt.vetoesNeeded){
+    hostState.rt.phase='choose';
+    const sorted=[...hostState.players].sort((a,b)=>a.score-b.score);
+    hostState.rt.pickOrder=sorted.map(p=>p.id);
+    hostState.rt.pickOrderNames=sorted.map(p=>p.name);
+    hostState.rt.pickTurn=0;
+    logHostEvent("Этап вето закончен! Выбираем категории (начиная с отстающих).","text-yellow-400 font-bold");
+  }
+  broadcastStateToPlayers(); updateHostUI();
+}
+
+function handleSnowballDecision(player,decision){
+  if(!hostState.rt.awaitingDecision) return;
+  hostState.rt.awaitingDecision=false;
+  if(decision==='bank'){
+    changeScore(player,hostState.rt.bankedPoints);
+    logHostEvent(`${player.name} забрал очки (+${hostState.rt.bankedPoints}б.) и завершил круг.`,"text-emerald-400 font-bold");
+    hostState.rt.chainDone=true;
+    advanceAfterVerdict();
+  } else {
+    hostState.rt.chainIdx+=1;
+    logHostEvent(`${player.name} идёт ва-банк на ступень ${(hostState.rt.chainIdx)+1}!`,"text-pink-400 font-bold");
+    hostState.showOptions=false;
+    broadcastStateToPlayers(); updateHostUI();
+    setTimeout(()=>{ hostState.showOptions=true; broadcastStateToPlayers(); updateHostUI(); }, 4000);
+  }
+}
+
+function vetoResolveAll(){
+  const rt=hostState.rt;
+  const results=[];
+  Object.keys(rt.betAnswers||{}).forEach(pid=>{
+    const player=hostState.players.find(p=>p.id==pid);
+    const catIdx=rt.chosenByPlayerId[pid];
+    const cat=rt.categories[catIdx];
+    const {bid,choice}=rt.betAnswers[pid];
+    const isCorrect=choice===cat.c;
+    changeScore(player, isCorrect?bid:-bid);
+    results.push(`${player.name}: ${isCorrect?'✅ +':'❌ -'}${bid}`);
+  });
+  logHostEvent("Ставки вскрыты: "+results.join(' | '),"text-yellow-400 font-bold");
+  hostState.rt.resolved=true;
+  broadcastStateToPlayers(); updateHostUI();
+  setTimeout(()=>{ finishRoundAndAdvance(); },4000);
+}
+
+/* =========================================================================
+   РУЧНОЕ УПРАВЛЕНИЕ УСТНЫМИ РАУНДАМИ
+========================================================================= */
+function oralNextQuestion(){
+  hostState.activeQuestionIdx+=1;
+  const total=(hostState.roundQuestions.questions||[]).length;
+  if(hostState.activeQuestionIdx>=total) hostState.activeQuestionIdx=0;
+  broadcastStateToPlayers(); updateHostUI();
+}
+function oralMarkCorrect(){
+  hostState.rt.correctCount=(hostState.rt.correctCount||0)+1;
+  logHostEvent("Устный ответ засчитан верно","text-emerald-400");
+  oralNextQuestion();
+}
+function oralMarkWrong(){ oralNextQuestion(); }
+function oralFinishTurn(){
+  clearInterval(countdownTimer);
+  const activePlayer=hostState.players[hostState.activePlayerIdx];
+  const pts=Math.floor((hostState.rt.correctCount||0)/2);
+  changeScore(activePlayer,pts);
+  logHostEvent(`${activePlayer.name} завершил блиц: +${pts} б.`,"text-yellow-400 font-bold");
+  hostState.rt.correctCount=0;
+  hostState.activeQuestionIdx=0;
+  hostState.activePlayerIdx+=1;
+  if(hostState.activePlayerIdx>=hostState.players.length){ finishRoundAndAdvance(); return; }
+  runPlayerAnnouncement();
+  updateHostUI();
+}
+
+function blackboxNextClue(){
+  hostState.rt.clueIdx=Math.min(3,(hostState.rt.clueIdx||0)+1);
+  broadcastStateToPlayers(); updateHostUI();
+}
+function blackboxJudge(isCorrect){
+  const qData=hostState.roundQuestions.questions[hostState.activeQuestionIdx];
+  const activePlayer=hostState.players[hostState.activePlayerIdx];
+  const pointsByStage=[4,3,2,1];
+  const pts=isCorrect?pointsByStage[hostState.rt.clueIdx||0]:0;
+  changeScore(activePlayer,pts);
+  logHostEvent(`${activePlayer.name} ${isCorrect?'угадал!':'ошибся'} (+${pts}б.)`,"text-emerald-400");
+  triggerVerdictOverlay(activePlayer.name,isCorrect,null,qData.c);
+}
+
+function survivorJudge(isCorrect){
+  clearInterval(countdownTimer);
+  const activePlayer=hostState.players[hostState.activePlayerIdx];
+  if(!activePlayer) return;
+  if(!isCorrect){
+    activePlayer.alive=false;
+    logHostEvent(`${activePlayer.name} выбывает из игры!`,"text-red-400 font-bold");
+  } else {
+    logHostEvent(`${activePlayer.name} дал верный ответ устно.`,"text-emerald-400");
+  }
+  const alive=hostState.players.filter(p=>p.alive);
+  broadcastStateToPlayers(); updateHostUI();
+  if(alive.length<=1){
+    if(alive.length===1) changeScore(alive[0],3);
+    logHostEvent(`Победитель выживания: ${alive.length===1?alive[0].name:'никто'} (+3)`,"text-yellow-400 font-bold");
+    setTimeout(finishRoundAndAdvance,1500);
+    return;
+  }
+  let next=(hostState.activePlayerIdx+1)%hostState.players.length;
+  let guard=0;
+  while(!hostState.players[next].alive && guard<20){ next=(next+1)%hostState.players.length; guard++; }
+  hostState.activePlayerIdx=next;
+  hostState.activeQuestionIdx=(hostState.activeQuestionIdx+1)%hostState.roundQuestions.questions.length;
+  runPlayerAnnouncement(); // Раунд 12: Быстрый запуск анонса
+}
+
+function auctionCloseBidding(){
+  const bids=hostState.rt.bids||{};
+  let winnerId=null,maxBid=0;
+  Object.keys(bids).forEach(pid=>{ if(bids[pid]>maxBid){ maxBid=bids[pid]; winnerId=parseInt(pid,10); } });
+  if(winnerId===null){ alert("Ставок не обнаружено!"); return; }
+  hostState.rt.stage='play';
+  hostState.rt.winningBid=maxBid;
+  hostState.activePlayerIdx=hostState.players.findIndex(p=>p.id===winnerId);
+  hostState.showOptions=false;
+  logHostEvent(`Лот выиграл ${hostState.players[hostState.activePlayerIdx].name} со ставкой ${maxBid}`,"text-yellow-400 font-bold");
+  broadcastStateToPlayers(); updateHostUI();
+  setTimeout(()=>{ hostState.showOptions=true; broadcastStateToPlayers(); updateHostUI(); }, 4000);
+}
+
+/* =========================================================================
+   ОБНОВЛЕНИЕ UI ХОСТА
+========================================================================= */
+function updateHostUI(){
+  const lobbyGrid=document.getElementById('tv-lobby-players-grid');
+  if(hostState.players.length===0){
+    lobbyGrid.innerHTML=`<div class="col-span-full text-center text-xs font-black uppercase text-zinc-500 tracking-wider">Ожидание игроков...</div>`;
+  } else {
+    lobbyGrid.innerHTML=hostState.players.map(p=>`<div class="neon-shadow-cyan bg-zinc-950 p-4 rounded-2xl text-center"><div class="text-xs font-black text-white truncate">${p.name}</div><div class="text-[9px] text-cyan-400 font-extrabold uppercase mt-1">CONNECTED</div></div>`).join('');
+  }
+
+  document.getElementById('tv-scoreboard').innerHTML=hostState.players.map(p=>`<div class="neon-shadow-cyan bg-zinc-950 p-4 text-center rounded-2xl ${p.alive===false?'opacity-30':''}"><div class="text-[9px] font-black uppercase text-zinc-500 truncate">${p.name}${p.alive===false?' 💀':''}</div><div class="neon-font text-2xl text-yellow-300 tracking-tight mt-1">${p.score}</div></div>`).join('');
+
+  document.getElementById('host-manual-scores').innerHTML=hostState.players.map(p=>`
+    <div class="flex items-center justify-between bg-zinc-950 p-2 rounded-xl border border-zinc-900">
+      <span class="text-[10px] font-bold text-zinc-300 truncate max-w-[100px]">${p.name}</span>
+      <div class="flex gap-1">
+        <button onclick="adjustScoreManual(${p.id},-1)" class="bg-pink-600/20 hover:bg-pink-600 border border-pink-500/30 text-pink-500 text-xs px-2 py-0.5 rounded-lg">-1</button>
+        <button onclick="adjustScoreManual(${p.id},1)" class="bg-cyan-500/20 hover:bg-cyan-500 border border-cyan-500/30 text-cyan-400 text-xs px-2 py-0.5 rounded-lg">+1</button>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('host-round-num').innerText=hostState.currentRound;
+  document.getElementById('round-indicator-host').innerText=`РАУНД ${hostState.currentRound} из 15`;
+  const config=ROUND_DETAILS[hostState.currentRound];
+  document.getElementById('round-name-host').innerText=`Механика: ${config.name}`;
+
+  renderHostConfigurator();
+  renderHostCheatSheet();
+  renderHostRoundControls();
+  renderHostTVStage(config);
+}
+
+/* ДИНАМИЧЕСКИЙ МОНТАЖ ПОЛЕЙ ВВОДА ДЛЯ РАУНДОВ */
+function renderHostConfigurator() {
+  const container = document.getElementById('host-dynamic-configurator');
+  if (!container) return;
+  
+  const rNum = hostState.currentRound;
+  const conf = ROUND_CONFIGS[rNum] || { fields: [{ id: 'theme', label: 'Тема раунда', type: 'text', default: 'Общие знания' }] };
+  
+  let html = '';
+  if (conf && conf.fields) {
+    conf.fields.forEach(field => {
+      let curVal = document.getElementById(`config-field-${field.id}`)?.value;
+      if (curVal === undefined) {
+        if (field.id === 'topics' && rNum === 15) {
+          const pCount = hostState.players.length || 4;
+          const requiredCount = pCount * 2;
+          const defaultTopics = ["История", "Космос", "Мифы", "Игры", "География", "Кино", "Еда", "Музыка", "Животные", "Технологии", "Физика", "Литература"];
+          curVal = defaultTopics.slice(0, requiredCount).join(', ');
+        } else {
+          curVal = field.default || '';
+        }
+      }
+      
+      html += `
+        <div>
+          <label class="block text-[9px] font-black uppercase text-zinc-500 mb-1">${field.label || ''}</label>
+          <input id="config-field-${field.id}" type="text" value="${curVal}" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 font-bold">
+        </div>
+      `;
+    });
+  }
+  
+  let tip = "Просто введите тему, ИИ сам разложит ее на вопросы.";
+  if (rNum === 2) tip = "Введите ровно 4 категории через запятую.";
+  else if (rNum === 8) tip = "Укажите загадку или оставьте пустым — ИИ выберет секрет сам.";
+  else if (rNum === 15) tip = "Категории финала. Количество тем должно равняться: Число Игроков × 2.";
+  
+  html += `<span class="block text-[8px] text-zinc-600 mt-1 uppercase">${tip}</span>`;
+  container.innerHTML = html;
+}
+
+function renderHostCheatSheet(){
+  const box=document.getElementById('host-cheat-sheet');
+  if (!box) return;
+  if(!hostState.roundQuestions || hostState.gameOver){ box.innerHTML=`<span class="text-zinc-500">Ожидание создания вопросов...</span>`; return; }
+  const type=roundType(hostState.currentRound);
+  let qData=null;
+  try{
+    if(type==='snowball') qData=hostState.roundQuestions.questions[hostState.activeQuestionIdx]?.chain[hostState.rt.chainIdx||0];
+    else if(type==='blind') qData=hostState.rt.activeQIdx!==undefined?hostState.roundQuestions.questions[hostState.rt.activeQIdx]:null;
+    else if(type==='auction') qData=hostState.roundQuestions.questions[0];
+    else if(type==='union') qData=hostState.roundQuestions.questions[0];
+    else if(type==='veto') qData=null;
+    else qData=hostState.roundQuestions.questions[hostState.activeQuestionIdx];
+  }catch(e){ qData=null; }
+
+  if(type==='veto'){
+    const rt=hostState.rt;
+    box.innerHTML=`<div class="space-y-1 text-[11px]">${(rt.categories||[]).map((c,idx)=>`<div class="${rt.vetoed.includes(idx)?'line-through text-zinc-600':''}"><span class="text-zinc-500">${c.name}:</span> <span class="text-emerald-400 font-bold">${c.a[c.c]}</span></div>`).join('')}</div>`;
+    return;
+  }
+  if(!qData){ box.innerHTML=`<span class="text-zinc-500">Ожидание...</span>`; return; }
+  const letter=qData.c!==undefined?String.fromCharCode(1040+qData.c):'';
+  box.innerHTML=`<div class="space-y-1">
+    <div><span class="text-zinc-500">Вопрос:</span> <span class="font-bold text-white">${qData.q}</span></div>
+    ${qData.a?`<div class="text-sm pt-1">💡 <span class="text-emerald-400 font-extrabold uppercase">ОТВЕТ: ${letter}) ${qData.a[qData.c]}</span></div>`:''}
+    ${qData.mine!==undefined?`<div class="text-[10px] text-red-400">⚠️ Мина: ${String.fromCharCode(1040+qData.mine)}</div>`:''}
+    ${qData.clues?`<div class="text-[10px] text-zinc-500">Подсказки: ${qData.clues.join(' → ')}</div>`:''}
+  </div>`;
+}
+
+function renderHostRoundControls(){
+  const box=document.getElementById('host-round-controls');
+  if (!box) return;
+  const type=roundType(hostState.currentRound);
+
+  /* Перенос кнопки Начать игру в мобильный пульт хоста */
+  if (hostState.roundStage === 'lobby') {
+    box.innerHTML = `
+      <div class="space-y-2">
+        <p class="text-[10px] text-zinc-400">Когда все игроки подключатся, запустите лобби:</p>
+        <button onclick="hostForceStartFromLobby()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl uppercase text-xs border-b-4 border-emerald-900">Начать игру ▶</button>
+      </div>`;
+    return;
+  }
+
+  if(!hostState.roundQuestions || hostState.roundStage==='rules'){
+    box.innerHTML=`<span class="text-zinc-500 text-[11px]">Скопируйте промпт, получите JSON от нейросети, вставьте в поле снизу и нажмите "Принять JSON".</span>`;
+    return;
+  }
+  if(type==='oral'){
+    box.innerHTML=`<div class="space-y-2">
+      <div class="text-[10px] text-zinc-400">Таймер: <b class="text-yellow-300">${hostState.rt.timeLeft??45}с</b> | Ответов: <b class="text-emerald-400">${hostState.rt.correctCount||0}</b></div>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="oralMarkCorrect()" class="bg-emerald-600 text-white text-[10px] font-black py-2 rounded-xl uppercase">✅ Верно</button>
+        <button onclick="oralMarkWrong()" class="bg-red-600 text-white text-[10px] font-black py-2 rounded-xl uppercase">❌ Мимо</button>
+      </div>
+      <button onclick="oralFinishTurn()" class="w-full bg-yellow-500 text-black text-[10px] font-black py-2 rounded-xl uppercase">⏹ Передать ход</button>
+    </div>`;
+    return;
+  }
+  if(type==='blackbox'){
+    box.innerHTML=`<div class="space-y-2">
+      <div class="text-[10px] text-zinc-400">Ступень: <b class="text-yellow-300">${(hostState.rt.clueIdx||0)+1}/4</b></div>
+      <button onclick="blackboxNextClue()" class="w-full bg-indigo-600 text-white text-[10px] font-black py-2 rounded-xl uppercase">➡ След. Подсказка</button>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="blackboxJudge(true)" class="bg-emerald-600 text-white text-[10px] font-black py-2 rounded-xl uppercase">✅ Верно</button>
+        <button onclick="blackboxJudge(false)" class="bg-red-600 text-white text-[10px] font-black py-2 rounded-xl uppercase">❌ Мимо</button>
+      </div>
+    </div>`;
+    return;
+  }
+  if(type==='survivor'){
+    const alive=hostState.players.filter(p=>p.alive).map(p=>p.name).join(', ');
+    box.innerHTML=`<div class="space-y-2">
+      <div class="text-[10px] text-zinc-400">Таймер: <b class="text-yellow-300">${hostState.rt.timeLeft??5}с</b></div>
+      <div class="text-[10px] text-zinc-500">В живых: ${alive}</div>
+      <div class="grid grid-cols-2 gap-2">
+        <button onclick="survivorJudge(true)" class="bg-emerald-600 text-white text-[10px] font-black py-2 rounded-xl uppercase">✅ Верно</button>
+        <button onclick="survivorJudge(false)" class="bg-red-600 text-white text-[10px] font-black py-2 rounded-xl uppercase">❌ Вылет</button>
+      </div>
+    </div>`;
+    return;
+  }
+  if(type==='auction'){
+    if(hostState.rt.stage==='bidding'){
+      const bids=hostState.rt.bids||{};
+      const list=hostState.players.map(p=>`${p.name}: ${bids[p.id]!==undefined?bids[p.id]+'б.':'ожидание...'}`).join('<br>');
+      box.innerHTML=`<div class="space-y-2"><div class="text-[10px] text-zinc-400">${list}</div><button onclick="auctionCloseBidding()" class="w-full bg-yellow-500 text-black text-[10px] font-black py-2 rounded-xl uppercase">🔨 Закрыть торги</button></div>`;
+    } else box.innerHTML=`<span class="text-zinc-500 text-[11px]">Игрок отвечает на выигранную ставку.</span>`;
+    return;
+  }
+  if(type==='veto'){
+    const rt=hostState.rt;
+    if(rt.phase==='bet_answer'){
+      const submitted=Object.keys(rt.betAnswers||{}).length;
+      const total=Object.keys(rt.chosen||{}).length;
+      box.innerHTML=`<div class="space-y-2"><div class="text-[10px] text-zinc-400">Принято ставок: ${submitted}/${total}</div><button ${rt.resolved?'disabled':''} onclick="vetoResolveAll()" class="w-full bg-yellow-500 text-black text-[10px] font-black py-2 rounded-xl uppercase">🎉 Раскрыть результаты ставок</button></div>`;
+    } else {
+      box.innerHTML=`<span class="text-zinc-500 text-[11px]">Ожидание действий на смартфонах игроков.</span>`;
+    }
+    return;
+  }
+  if(type==='snowball'){
+    box.innerHTML=`<span class="text-zinc-500 text-[11px]">Ступень цепочки: ${(hostState.rt.chainIdx||0)+1}/3.</span>`;
+    return;
+  }
+  box.innerHTML=`<span class="text-zinc-500 text-[11px]">Раунд протекает в автоматическом режиме на мобильных экранах.</span>`;
+}
+
+function renderHostTVStage(config){
+  const lobbyStage=document.getElementById('tv-lobby-stage');
+  const rulesStage=document.getElementById('tv-rules-stage');
+  const revealStage=document.getElementById('tv-reveal-stage');
+  const playStage=document.getElementById('tv-play-stage');
+  const podiumStage=document.getElementById('tv-podium-stage');
+
+  if (!lobbyStage || !rulesStage || !revealStage || !playStage || !podiumStage) return;
+
+  [lobbyStage,rulesStage,revealStage,playStage,podiumStage].forEach(el=>{
+    el.classList.add('hidden');
+    el.classList.remove('flex');
+  });
+
+  if(hostState.gameOver){ 
+    podiumStage.classList.remove('hidden'); 
+    return; 
+  }
+
+  /* Исправление: Экран лобби ТВ-экрана никогда не становится черным до старта игры */
+  if(hostState.roundStage==='lobby'){ 
+    lobbyStage.classList.remove('hidden'); 
+    return; 
+  }
+
+  if(hostState.roundStage==='rules'){
+    rulesStage.classList.remove('hidden');
+    const rName = config.name || '';
+    const rRules = config.rules || '';
+    document.getElementById('tv-rules-title').innerText=rName.toUpperCase();
+    document.getElementById('tv-rules-desc').innerText=rRules;
+    return;
+  }
+  if(hostState.roundStage==='reveal'){
+    revealStage.classList.remove('hidden');
+    revealStage.classList.add('flex');
+    const curTheme = hostState.theme || '';
+    document.getElementById('tv-reveal-theme').innerText=curTheme.toUpperCase();
+    return;
+  }
+  if(hostState.roundStage==='announcement') return;
+  if(hostState.roundStage!=='play') return;
+
+  playStage.classList.remove('hidden');
+  if(!hostState.roundQuestions) return;
+  const type=roundType(hostState.currentRound);
+  const activePlayer=hostState.players[hostState.activePlayerIdx];
+  document.getElementById('tv-active-turn-indicator').innerText=activePlayer?`Отвечает: ${activePlayer.name.toUpperCase()}`:'';
+  
+  const extraIndicator=document.getElementById('tv-extra-indicator');
+  extraIndicator.classList.add('hidden');
+
+  const qWrapper=document.getElementById('tv-question-wrapper');
+  const previewGrid=document.getElementById('tv-answers-preview');
+  const clueBox=document.getElementById('tv-blackbox-clues');
+  const catGrid=document.getElementById('tv-categories-grid');
+  const bidsList=document.getElementById('tv-bids-list');
+  clueBox.classList.add('hidden'); catGrid.classList.add('hidden'); bidsList.classList.add('hidden');
+  
+  document.getElementById('tv-question-text').innerText='';
+  previewGrid.innerHTML='';
+
+  if(type==='blind' && hostState.rt.stage==='choose_category'){
+    catGrid.classList.remove('hidden');
+    catGrid.innerHTML=hostState.rt.categories.map((c,idx)=>`<div class="p-3 rounded-xl text-xs font-bold text-center ${hostState.rt.usedCats.includes(idx)?'bg-zinc-900 text-zinc-700 line-through':'bg-indigo-600 text-white'}">${c}</div>`).join('');
+    document.getElementById('tv-question-text').innerText='ВЫБОР КАТЕГОРИИ';
+    return;
+  }
+  if(type==='blind' && hostState.rt.stage==='reveal_value'){
+    document.getElementById('tv-question-text').innerText=`СТОИМОСТЬ ВОПРОСА: ${hostState.rt.currentValue} БАЛЛ(А/ОВ)`;
+    return;
+  }
+  if(type==='auction' && hostState.rt.stage==='bidding'){
+    bidsList.classList.remove('hidden');
+    const bids=hostState.rt.bids||{};
+    bidsList.innerHTML=`<div class="text-yellow-300 uppercase mb-1">Лот: ${hostState.theme}</div>`+hostState.players.map(p=>`<div>${p.name}: ${bids[p.id]!==undefined?bids[p.id]+' б.':'ожидание...'}</div>`).join('');
+    document.getElementById('tv-question-text').innerText='ИДУТ ТОРГИ...';
+    return;
+  }
+  if(type==='oral'||type==='blackbox'||type==='survivor'){
+    /* РАУНД 7/12: Вырезание правильного устного ответа в скобках на ТВ экране */
+    let rawQ = getCurrentQuestionData()?.q||'';
+    document.getElementById('tv-question-text').innerText=cleanOralQuestion(rawQ);
+
+    if(type==='blackbox'){
+      clueBox.classList.remove('hidden');
+      const clues=getCurrentQuestionData()?.clues||[];
+      clueBox.innerHTML=clues.map((c,idx)=>`<div class="p-2 rounded-lg text-xs ${idx<=(hostState.rt.clueIdx||0)?'bg-zinc-800 text-white':'bg-zinc-950 text-zinc-700'}">${idx+1}. ${idx<=(hostState.rt.clueIdx||0)?c:'???' }</div>`).join('');
+    }
+    if(type==='survivor'||type==='oral'){
+      extraIndicator.classList.remove('hidden');
+      extraIndicator.innerText=`⏱ ${hostState.rt.timeLeft??''}с`;
+    }
+    return;
+  }
+  if(type==='veto'){
+    const rt=hostState.rt;
+    catGrid.classList.remove('hidden');
+    if(rt.phase==='veto'||rt.phase==='choose'){
+      catGrid.innerHTML=rt.categories.map((c,idx)=>{
+        if(rt.vetoed.includes(idx)) return `<div class="p-3 rounded-xl text-xs font-bold text-center bg-zinc-900 text-zinc-700 line-through">${c.name}</div>`;
+        if(rt.chosen[idx]!==undefined) return `<div class="p-3 rounded-xl text-xs font-bold text-center bg-emerald-700 text-white">${c.name}<br><span class="text-[9px]">${rt.chosen[idx]}</span></div>`;
+        return `<div class="p-3 rounded-xl text-xs font-bold text-center bg-indigo-600 text-white">${c.name}</div>`;
+      }).join('');
+      document.getElementById('tv-question-text').innerText=rt.phase==='veto'?'ИГРОКИ НАКЛАДЫВАЮТ ВЕТО':'ИГРОКИ ЗАБИРАЮТ ТЕМЫ';
+    } else {
+      document.getElementById('tv-question-text').innerText=rt.resolved?'СТАВКИ И ОТВЕТЫ РАСКРЫТЫ!':'ОЖИДАНИЕ СТАВОК И ОТВЕТОВ...';
+      catGrid.innerHTML=rt.categories.map((c,idx)=>rt.chosen[idx]!==undefined?`<div class="p-3 rounded-xl text-xs font-bold text-center bg-yellow-500 text-black">${c.name}<br><span class="text-[9px]">${rt.chosen[idx]}</span></div>`:'').join('');
+    }
+    return;
+  }
+
+  const qData=getCurrentQuestionData();
+  if(!qData) return;
+  document.getElementById('tv-question-text').innerText=qData.q;
+  
+  if(hostState.showOptions){
+    qWrapper.className="tv-question-box active text-center w-full";
+    previewGrid.className="tv-options-box visible grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto pt-4";
+    previewGrid.innerHTML=qData.a.map((ans,idx)=>`
+      <div class="p-4 bg-zinc-950/90 border-2 border-zinc-800 rounded-2xl text-left text-xs font-bold flex items-center gap-3 shadow-xl hover:border-pink-500 transition-colors animate__animated animate__fadeInUp" style="animation-delay: ${idx * 0.15}s">
+        <span class="bg-pink-600 text-white px-2.5 py-1 rounded-xl text-[10px] font-black uppercase">${String.fromCharCode(1040+idx)}</span>
+        <span class="text-zinc-100 flex-grow text-left">${ans}</span>
+      </div>`).join('');
+  } else {
+    qWrapper.className="tv-question-box centered text-center w-full px-4";
+    previewGrid.className="tv-options-box grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl mx-auto pt-4";
+    previewGrid.innerHTML='';
+  }
+  if(type==='carousel'){ extraIndicator.classList.remove('hidden'); extraIndicator.innerText=`Банк: +${hostState.rt.bank||0}`; }
+  if(type==='snowball'){ extraIndicator.classList.remove('hidden'); extraIndicator.innerText=`Ступень ${(hostState.rt.chainIdx||0)+1}/3`; }
+}
+
+function adjustScoreManual(pId,val){
+  const p=hostState.players.find(pl=>pl.id===pId);
+  if(p) changeScore(p,val);
+  updateScoreboardAndControllers();
+}
+function updateScoreboardAndControllers(){ updateHostUI(); broadcastStateToPlayers(); }
+
+function hostForceStartFromLobby(){
+  if(hostState.players.length===0){ alert("Дождитесь хотя бы одного подключения!"); return; }
+  hostState.roundStage='rules';
+  updateHostUI(); broadcastStateToPlayers();
+}
+
+function showFinalVictoryPodium(){
+  hostState.gameOver=true;
+  const sorted=[...hostState.players].sort((a,b)=>b.score-a.score);
+  document.getElementById('tv-podium-list').innerHTML=sorted.map((p,idx)=>`
+    <div class="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl flex justify-between items-center shadow-lg">
+      <span class="text-xs font-black uppercase text-zinc-500">${idx+1} Место</span>
+      <span class="font-bold text-white">${p.name}</span>
+      <span class="neon-font text-yellow-300">${p.score} б.</span>
+    </div>`).join('');
+  broadcastStateToPlayers();
+  updateHostUI();
+}
+
+function logHostEvent(text,colorClass="text-zinc-400"){
+  const logBox=document.getElementById('event-log');
+  if(!logBox) return;
+  const entry=document.createElement('div');
+  entry.className=`${colorClass} py-0.5 border-b border-zinc-900`;
+  entry.innerText=text;
+  logBox.appendChild(entry);
+  logBox.scrollTop=logBox.scrollHeight;
+}
+
+/* ГЕНЕРАТОР ПРОМПТОВ ПОД ДАННЫЕ РАУНДА */
+function copyRoundPrompt(){
+  const rNum = hostState.currentRound;
+  const pCount = hostState.players.length || 4;
+  const catCount = rNum === 15 ? pCount * 2 : (rNum === 2 ? 4 : pCount);
+
+  let themeVal = "";
+  let customTopicsVal = "";
+  let secretItemVal = "";
+
+  const fTheme = document.getElementById('config-field-theme');
+  if (fTheme) themeVal = fTheme.value.trim();
+  
+  const fTopics = document.getElementById('config-field-topics');
+  if (fTopics) customTopicsVal = fTopics.value.trim();
+
+  const fSecret = document.getElementById('config-field-secret_item');
+  if (fSecret) secretItemVal = fSecret.value.trim();
+
+  if (!themeVal) themeVal = "Общие знания";
+
+  let promptSpec = "";
+  if (rNum === 1) {
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов: "q" (очень легкий вопрос по теме ${themeVal}), "a" (4 варианта ответа), "c" (индекс верного ответа от 0 до 3).`;
+  } else if (rNum === 2) {
+    const topics = customTopicsVal ? customTopicsVal.split(',').map(s=>s.trim()) : ["Кино", "Космос", "Еда", "Спорт"];
+    promptSpec = `Массив "questions" ровно из 4 объектов (каждый соответствует теме из списка [${topics.join(', ')}]): "category" (название темы из списка), "q" (вопрос средней сложности), "a" (4 варианты ответа), "c" (индекс верного ответа от 0 до 3).`;
+  } else if (rNum === 3) {
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов: "q" (вопрос на упорядочивание по теме ${themeVal}, например: восстановить хронологию событий), "a" (4 варианта ответа, которые ДОЛЖНЫ быть в правильном порядке. a[0] идет первым, a[1] вторым, a[2] третьим, a[3] четвертым), "c" (0).`;
+  } else if (rNum === 4) {
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов по теме ${themeVal}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины — неверного, но крайне правдоподобного ответа, обязательно отличается от c).`;
+  } else if (rNum === 5) {
+    promptSpec = `Массив "questions" ровно из 1 объекта по теме ${themeVal}: "q" (вопрос средней сложности), "a" (4 варианта), "c" (индекс верного ответа от 0 до 3).`;
+  } else if (rNum === 6) {
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов по теме ${themeVal}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного ответа от 0 до 3).`;
+  } else if (rNum === 7) {
+    promptSpec = `Массив "questions" из 12 объектов для быстрого устного блица по теме ${themeVal}, без вариантов ответов: "q" (короткий вопрос и ответ в скобках, например "Первый космонавт Земли? (Гагарин)").`;
+  } else if (rNum === 8) {
+    const itemText = secretItemVal ? `конкретно про предмет "${secretItemVal}"` : `какой-то интересный предмет в контексте темы ${themeVal}`;
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов: "q" (главный вопрос-загадка по теме ${themeVal}, например: "Угадайте предмет по подсказкам"), "clues" (массив ровно из 4 подсказок ${itemText}, идущих от очень сложной/размытой к очевидной), "a" (4 варианта ответа), "c" (индекс верного).`;
+  } else if (rNum === 9) {
+    promptSpec = `Массив "questions" из 1 объекта: "q" (сложный вопрос с глубокой логикой по теме ${themeVal}), "a" (4 варианта), "c" (индекс верного).`;
+  } else if (rNum === 10) {
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов, каждый представляет собой цепочку возрастающей сложности по теме ${themeVal}: "chain" (массив ровно из 3 объектов: 1-й легкий, 2-й средний, 3-й сложный. У каждого: "q" (вопрос), "a" (4 варианта), "c" (индекс верного)).`;
+  } else if (rNum === 11) {
+    promptSpec = `Массив "questions" из 12 простых и быстрых вопросов по теме ${themeVal}: "q", "a" (4 варианта), "c" (индекс верного).`;
+  } else if (rNum === 12) {
+    promptSpec = `Массив "questions" из 12 быстрых устных вопросов по теме ${themeVal}: "q" (вопрос и краткий ответ в скобках).`;
+  } else if (rNum === 13) {
+    promptSpec = `Массив "questions" из 1 сложного вопроса на коллективное обсуждение по теме ${themeVal}: "q", "a" (4 варианта), "c" (индекс верного).`;
+  } else if (rNum === 14) {
+    promptSpec = `Массив "questions" ровно из ${pCount} усложненных финальных вопросов по теме ${themeVal}: "q", "a" (4 варианта), "c" (индекс верного).`;
+  } else if (rNum === 15) {
+    const topics = customTopicsVal ? customTopicsVal.split(',').map(s=>s.trim()) : ["Спорт", "Кино", "История", "Музыка", "Космос", "Еда", "Мифы", "Игры"];
+    promptSpec = `Массив "categories" ровно из ${topics.length} объектов (для каждой темы: [${topics.join(', ')}]): "name" (название темы), "q" (вопрос высокой сложности), "a" (4 варианта), "c" (индекс верного).`;
+  }
+
+  const systemPrompt = `Ты — ведущий хардкор-игры ДУМАТЬ НАДО. Сгенерируй строго валидный JSON. Никакого markdown, комментариев, лишних слов или оберток \`\`\`json. Только чистый JSON-объект.
+Спецификация раунда: ${promptSpec}
+Верни только объект вида, описанного в спецификации выше (с корневым ключом "questions" или "categories").`;
+
+  navigator.clipboard.writeText(systemPrompt).then(()=>{
+    logHostEvent(`Промпт для Раунда ${rNum} скопирован в буфер!`,"text-cyan-400 font-bold");
+    alert(`Промпт для Раунда ${rNum} успешно скопирован в буфер обмена!\nВставьте его нейросети для получения вопросов.`);
+  }).catch(()=>{
+    alert("Скопируйте текст промпта вручную:\n\n" + systemPrompt);
+  });
+}
+
+/* =========================================================================
+   ТРАНСЛЯЦИЯ СОСТОЯНИЯ ИГРОКАМ
+========================================================================= */
+function broadcastStateToPlayers(){
+  const scores={}; hostState.players.forEach(p=>{ scores[p.name]=p.score; });
+  const hasAnswered=[];
+  Object.keys(hostState.answersReceived).forEach(pId=>{ const pl=hostState.players.find(p=>p.id==pId); if(pl) hasAnswered.push(pl.name); });
+
+  let currentQuestionText="",optionsArray=[],cluesArray=[];
+  if(hostState.roundQuestions && (hostState.roundStage==='play')){
+    const qData=getCurrentQuestionData();
+    if(qData){ 
+      currentQuestionText=qData.q; 
+      optionsArray=qData.a||[]; 
+      cluesArray=qData.clues||[];
+
+      /* Вырезание правильного ответа для смартфонов игроков в устных раундах */
+      const type = roundType(hostState.currentRound);
+      if (type === 'oral' || type === 'survivor') {
+        currentQuestionText = cleanOralQuestion(currentQuestionText);
+      }
+    }
+  }
+
+  const podium=hostState.gameOver?[...hostState.players].sort((a,b)=>b.score-a.score):[];
+
+  hostState.players.forEach(p=>{
+    if(p.conn && p.conn.open){
+      p.conn.send({
+        type:"STATE_UPDATE",
+        currentRound:hostState.currentRound,
+        roundStage:hostState.roundStage,
+        roundType:roundType(hostState.currentRound),
+        roundName:ROUND_DETAILS[hostState.currentRound].name,
+        roundDesc:ROUND_DETAILS[hostState.currentRound].rules,
+        theme:hostState.theme,
+        scores:scores,
+        hasAnswered:hasAnswered,
+        questionText:currentQuestionText,
+        options:optionsArray,
+        clues:cluesArray, // РАУНД 8: Трансляция подсказок
+        activePlayerId: hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].id:null,
+        activePlayerName: hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].name:"",
+        myPlayerId:p.id,
+        feedback:hostState.feedbackData,
+        showOptions:hostState.showOptions,
+        rt:hostState.rt,
+        playersList:hostState.players.map(pl=>({id:pl.id,name:pl.name,score:pl.score,alive:pl.alive})),
+        gameOver:hostState.gameOver,
+        podium:podium
+      });
+    }
+  });
+}
+</script>
+</body>
+</html>
