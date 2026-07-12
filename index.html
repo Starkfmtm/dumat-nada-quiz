@@ -7,7 +7,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Montserrat:wght@400;500;700;900&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<!-- Использование стабильной версии PeerJS 1.5.4 -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
 body{font-family:'Montserrat',sans-serif;background-color:#080313;background-image:radial-gradient(circle at 50% 50%,#170732 0%,#080313 100%);}
 .neon-font{font-family:'Dela Gothic One',cursive;}
@@ -355,9 +356,9 @@ const ROUND_CONFIGS = {
 const ROUND_PROMPTS_FOR_AI = {
   1:`Массив "questions" ровно из {pCount} объектов: "q" (очень легкий вопрос по теме {theme}), "a" (4 варианта ответа), "c" (индекс верного ответа от 0 до 3).`,
   2:`Массив "questions" ровно из 4 объектов (по одному на каждую тему: {topics}): "category" (название темы из списка), "q" (вопрос средней сложности по этой теме), "a" (4 варианта ответа), "c" (индекс верного ответа от 0 до 3).`,
-  3:`Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме {theme}), "a" (4 варианта ответа в правильной последовательности от первого к последнему. То есть a[0] должен идти хронологически или логически первым, a[1  вторым и т.д.), "c" (0).`,
+  3:`Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме {theme}), "a" (4 варианта ответа в правильной последовательности от первого к последнему. То есть a[0] должен идти хронологически или логически первым, a[1] вторым и т.д.), "c" (0).`,
   4:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины, обязательно отличается от c).`,
-  5:`Массив "questions" из 1 объекта по теме {theme}: "q" (вопрос средней сложности), "a" (4 варианты), "c" (индекс верного).`, // Фикс Бага: Настроен лимит 1 вопроса для Короля горы
+  5:`Массив "questions" из 1 объекта по теме {theme}: "q" (вопрос средней сложности), "a" (4 варианты), "c" (индекс верного).`, // Настроен лимит 1 вопроса для Короля горы
   6:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного).`,
   7:`Массив "questions" из 12 объектов для устного блица по теме {theme} (без вариантов): "q" (короткий вопрос и ответ в скобках, например: "Столица Франции? (Париж)").`,
   8:`Массив "questions" из {pCount} объектов: "q" (вопрос "Угадайте секретный объект по подсказкам" по теме {theme}), "clues" (массив ровно из 4 подсказок {secretInfo} от сложной к простой), "a" (4 варианта финального ответа), "c" (индекс верного).`,
@@ -398,7 +399,7 @@ function cleanOralQuestion(qStr) {
 }
 
 /* =========================================================================
-   ПОДКЛЮЧЕНИЕ / ЛОББИ (Автоматический выбор https/wss)
+   ПОДКЛЮЧЕНИЕ / ЛОББИ (Явные защищенные настройки)
 ========================================================================= */
 function initHostLobby(){
   hostState.role='host';
@@ -407,8 +408,14 @@ function initHostLobby(){
 
   const rawCode=Math.floor(1000+Math.random()*9000).toString();
   
-  /* Возврат к стабильному автоматическому конструктору облака PeerJS */
-  peer=new Peer("DUMAT-"+rawCode);
+  /* Подключение к публичному серверу с явным прописыванием SSL параметров */
+  peer=new Peer("DUMAT-"+rawCode, {
+    host: "0.peerjs.com",
+    port: 443,
+    path: "/",
+    secure: true,
+    key: "peerjs"
+  });
 
   peer.on('open',(id)=>{
     hostState.roomCode=id.replace("DUMAT-","");
@@ -421,6 +428,11 @@ function initHostLobby(){
     if(err.type==='unavailable-id'){
       logHostEvent("Код занят, пересоздаём...","text-red-400");
       setTimeout(initHostLobby,300);
+    }
+    /* Защита от падения сигнального сервера: автоподключение при сбоях */
+    if (err.type === 'server-error') {
+      logHostEvent("Сбой связи с сервером. Повторная попытка через 2 сек...","text-yellow-400");
+      setTimeout(initHostLobby, 2000);
     }
   });
   peer.on('connection',(conn)=>{
@@ -446,8 +458,14 @@ function joinAsPlayer(){
 
   clientState.name=name; clientState.roomCode=code;
   
-  /* Возврат к стабильному автоматическому конструктору облака PeerJS */
-  peer=new Peer();
+  /* Инициализация игрока с явными SSL настройками во избежание Mixed Content */
+  peer=new Peer({
+    host: "0.peerjs.com",
+    port: 443,
+    path: "/",
+    secure: true,
+    key: "peerjs"
+  });
 
   peer.on('open',()=>{
     const conn=peer.connect("DUMAT-"+code,{reliable:true});
@@ -461,13 +479,13 @@ function joinAsPlayer(){
       conn.send({type:"JOIN",name:name});
     });
     conn.on('data',(data)=>{ if(data.type==="PING") return; handleIncomingHostData(data); });
-    conn.on('close',()=>{ alert("Соединение потеряно! Обновите страницу и введите то же имя."); });
+    conn.on('close',()=>{ alert("Соединение потеряно! Обновите страницу."); });
     conn.on('error',()=>{ if(!opened){ errBox.innerText="Комната не найдена."; errBox.classList.remove('hidden'); } });
   });
   
   peer.on('error',(err)=>{ 
     if (err.type === 'peer-unavailable') {
-      errBox.innerText = "Комната с таким кодом не найдена. Убедитесь, что ТВ-экран запущен.";
+      errBox.innerText = "Комната с таким кодом не найдена. Проверьте ТВ-экран.";
     } else {
       errBox.innerText = "Ошибка PeerJS: " + err.type;
     }
@@ -1838,7 +1856,7 @@ function copyRoundPrompt(){
   } else if (rNum === 9) {
     promptSpec = `Массив "questions" из 1 объекта: "q" (сложный вопрос с глубокой логикой по теме ${themeVal}), "a" (4 варианта), "c" (индекс верного).`;
   } else if (rNum === 10) {
-    promptSpec = `Массив "questions" ровно из ${pCount} объектов, каждый представляет собой цепочку возрастающей сложности по теме ${themeVal}: "chain" (массив ровно из 3 объектов: 1-й легкий, 2-й средний, 3-й сложный. У каждого: "q" (вопрос), "a" (4 варианта), "c" (индекс верного)).`;
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов, каждый представляет собой цепочку возрастающей сложности по теме ${themeVal}: "chain" (массив ровно из 3 объектов: 1-й легкий, 2-й средний, 3-й сложный. У каждого: "q" (вопрос), "a" (4 варианты), "c" (индекс верного)).`;
   } else if (rNum === 11) {
     promptSpec = `Массив "questions" из 12 простых и быстрых вопросов по теме ${themeVal}: "q", "a" (4 варианта), "c" (индекс верного).`;
   } else if (rNum === 12) {
