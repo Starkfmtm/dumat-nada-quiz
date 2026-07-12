@@ -7,8 +7,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Montserrat:wght@400;500;700;900&display=swap" rel="stylesheet">
-<!-- Использование стабильного CDN Cloudflare для PeerJS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<!-- Использование стабильной библиотеки MQTT over WebSockets вместо PeerJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
 <style>
 body{font-family:'Montserrat',sans-serif;background-color:#080313;background-image:radial-gradient(circle at 50% 50%,#170732 0%,#080313 100%);}
 .neon-font{font-family:'Dela Gothic One',cursive;}
@@ -17,7 +17,7 @@ body{font-family:'Montserrat',sans-serif;background-color:#080313;background-ima
 .neon-shadow-yellow{box-shadow:0 0 25px rgba(250,204,21,.4),inset 0 0 10px rgba(250,204,21,.15);border:3px solid #facc15;}
 .stagger-1{animation-delay:.2s}.stagger-2{animation-delay:.4s}.stagger-3{animation-delay:.6s}
 
-/* Плавная анимация появления вопроса и вариантов (стиль Jackbox/Бредовуха) */
+/* Плавная анимация появления вопроса и вариантов */
 .tv-question-box {
   transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.8s ease;
 }
@@ -189,7 +189,6 @@ body{font-family:'Montserrat',sans-serif;background-color:#080313;background-ima
           <span class="text-[9px] font-black text-zinc-500 uppercase">Раунд <span id="host-round-num">1</span>/15</span>
         </div>
         <div class="space-y-3">
-          <!-- Сюда динамически монтируются поля конфигурации каждого раунда -->
           <div id="host-dynamic-configurator" class="space-y-3"></div>
           
           <div class="grid grid-cols-2 gap-2">
@@ -325,7 +324,6 @@ const ROUND_DETAILS = {
 
 const ROUND_TYPE = {1:'classic',2:'blind',3:'order',4:'mine',5:'king',6:'sabotage',7:'oral',8:'blackbox',9:'auction',10:'snowball',11:'carousel',12:'survivor',13:'union',14:'classic2',15:'veto'};
 
-// Структура конфигураций полей ввода на панели хоста
 const ROUND_CONFIGS = {
   1: { fields: [{ id: 'theme', label: 'Тема раунда', type: 'text', default: 'Общие знания' }] },
   2: { fields: [
@@ -353,50 +351,20 @@ const ROUND_CONFIGS = {
   ]}
 };
 
-const ROUND_PROMPTS_FOR_AI = {
-  1:`Массив "questions" ровно из {pCount} объектов: "q" (очень легкий вопрос по теме {theme}), "a" (4 варианта ответа), "c" (индекс верного ответа от 0 до 3).`,
-  2:`Массив "questions" ровно из 4 объектов (по одному на каждую тему: {topics}): "category" (название темы из списка), "q" (вопрос средней сложности по этой теме), "a" (4 варианта ответа), "c" (индекс верного ответа от 0 до 3).`,
-  3:`Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме {theme}), "a" (4 варианта ответа в правильной последовательности от первого к последнему. То есть a[0] должен идти хронологически или логически первым, a[1] вторым и т.д.), "c" (0).`,
-  4:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины, обязательно отличается от c).`,
-  5:`Массив "questions" из 1 объекта по теме {theme}: "q" (вопрос средней сложности), "a" (4 варианты), "c" (индекс верного).`,
-  6:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного).`,
-  7:`Массив "questions" из 12 объектов для устного блица по теме {theme} (без вариантов): "q" (короткий вопрос и ответ в скобках, например: "Столица Франции? (Париж)").`,
-  8:`Массив "questions" из {pCount} объектов: "q" (вопрос "Угадайте секретный объект по подсказкам" по теме {theme}), "clues" (массив ровно из 4 подсказок {secretInfo} от сложной к простой), "a" (4 варианта финального ответа), "c" (индекс верного).`,
-  9:`Массив "questions" из 1 объекта: "q" (сложный вопрос с глубокой логикой по теме {theme}), "a" (4 варианты), "c" (индекс верного).`,
-  10:`Массив "questions" из {pCount} объектов: "chain" (массив из 3 объектов цепочки вопросов по теме {theme} возрастающей сложности: 1-й легкий, 2-й средний, 3-й сложный. У каждого: "q" (вопрос), "a" (4 варианта), "c" (индекс верного)).`,
-  11:`Массив "questions" из 12 простых и быстрых вопросов по теме {theme}: "q", "a" (4 варианта), "c" (индекс верного).`,
-  12:`Массив "questions" из 12 быстрых устных вопросов по теме {theme}: "q" (вопрос и краткий ответ в скобках).`,
-  13:`Массив "questions" из 1 сложного вопроса на коллективное обсуждение по теме {theme}: "q", "a" (4 варианта), "c" (индекс верного).`,
-  14:`Массив "questions" из {pCount} сложнейших вопросов по теме {theme}: "q", "a" (4 варианта), "c" (индекс верного).`,
-  15:`Массив "categories" ровно из {catCount} объектов (соответствующих списку категорий: {topics}): "name" (название темы), "q" (сложный вопрос), "a" (4 варианта), "c" (индекс верного).`
-};
-
 /* =========================================================================
-   СОСТОЯНИЕ ИГРЫ
+   СЕТЕВОЙ МОДУЛЬ НА ВЕБ-СОКЕТАХ (MQTT)
 ========================================================================= */
-let peer=null;
+let mqttClient = null;
+let roomTopic = '';
+
 let hostState={
   role:null, roomCode:null, players:[], currentRound:1, roundStage:'lobby',
   roundQuestions:null, activeQuestionIdx:0, activePlayerIdx:0, answersReceived:{},
   showOptions:false, feedbackData:null, gameOver:false, theme:'Разминка',
   rt:{} 
 };
-let clientState={conn:null,name:"",score:0,roomCode:"",myId:null};
+let clientState={name:"",score:0,roomCode:"",myId:null};
 let countdownTimer=null;
-
-/* Конфигурация для подключения к облаку PeerJS по безопасному протоколу */
-const peerServerConfig = {
-  host: '0.peerjs.com',
-  port: 443,
-  secure: true,
-  path: '/',
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-  }
-};
 
 function roundType(n){return ROUND_TYPE[n]||'classic';}
 function clampScore(v){return Math.max(0,v);}
@@ -406,114 +374,114 @@ function getLeader(){
   return hostState.players.reduce((best,p)=>p.score>best.score?p:best, hostState.players[0]);
 }
 
-/* Функция очистки устных вопросов от правильного ответа на публичных экранах */
 function cleanOralQuestion(qStr) {
   if (!qStr) return "";
   return qStr.replace(/\s*\(.*?\)\s*/g, "").trim();
 }
 
-/* =========================================================================
-   ПОДКЛЮЧЕНИЕ / ЛОББИ (Явный проброс безопасного соединения)
-========================================================================= */
+/* СОЗДАНИЕ КОМНАТЫ ВЕДУЩИМ */
 function initHostLobby(){
-  if (typeof Peer === 'undefined') {
-    alert("Критическая ошибка: библиотека сопряжения PeerJS заблокирована вашим AdBlock или Brave Shields! Отключите их и обновите вкладку.");
-    return;
-  }
-  
   hostState.role='host';
   document.getElementById('screen-entry').classList.add('hidden');
   document.getElementById('screen-host').classList.remove('hidden');
 
-  const rawCode=Math.floor(1000+Math.random()*9000).toString();
-  
-  /* Использование явной конфигурации параметров HTTPS соединения для предотвращения CORS-ошибок */
-  peer = new Peer("DUMAT-" + rawCode, peerServerConfig);
+  const rawCode = Math.floor(1000 + Math.random() * 9000).toString();
+  hostState.roomCode = rawCode;
+  document.getElementById('room-code-display').innerText = rawCode;
 
-  peer.on('open',(id)=>{
-    hostState.roomCode=id.replace("DUMAT-","");
-    document.getElementById('room-code-display').innerText=hostState.roomCode;
-    logHostEvent(`Лобби создано! Код: ${hostState.roomCode}`,"text-cyan-400 font-bold");
+  roomTopic = `dumat_quiz_v2/${rawCode}`;
+
+  /* Безопасное WebSockets подключение через глобальное публичное облако */
+  mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+    clientId: 'dumat_host_' + Math.random().toString(16).substring(2, 10),
+    keepalive: 30
   });
-  peer.on('error',(err)=>{
-    console.error(err);
-    logHostEvent(`Ошибка PeerJS: ${err.type}`,"text-red-400");
-    if(err.type==='unavailable-id'){
-      logHostEvent("Код занят, пересоздаём...","text-red-400");
-      setTimeout(initHostLobby,300);
+
+  mqttClient.on('connect', () => {
+    logHostEvent(`Лобби создано! Код: ${rawCode}`, "text-cyan-400 font-bold");
+    mqttClient.subscribe(`${roomTopic}/host`);
+  });
+
+  mqttClient.on('message', (topic, message) => {
+    try {
+      const data = JSON.parse(message.toString());
+      handleIncomingPlayerData(data);
+    } catch (e) {
+      console.error("Ошибка чтения входящего пакета:", e);
     }
   });
-  peer.on('connection',(conn)=>{
-    conn.on('data',(data)=>handleIncomingPlayerData(conn,data));
-    conn.on('close',()=>{
-      const p=hostState.players.find(pl=>pl.peerId===conn.peer);
-      if(p){ logHostEvent(`${p.name} отключился.`,"text-red-400"); updateHostUI(); }
-    });
-  });
 
-  setInterval(()=>{
-    hostState.players.forEach(p=>{ if(p.conn&&p.conn.open) p.conn.send({type:"PING"}); });
-  },5000);
+  mqttClient.on('error', (err) => {
+    logHostEvent(`Ошибка сети: ${err.message}`, "text-red-400");
+  });
 
   updateHostUI();
 }
 
+/* ВХОД ИГРОКА С МОБИЛЬНОГО УСТРОЙСТВА */
 function joinAsPlayer(){
-  if (typeof Peer === 'undefined') {
-    alert("Критическая ошибка: библиотека сопряжения PeerJS заблокирована вашим AdBlock или Brave Shields! Отключите их и обновите вкладку.");
-    return;
-  }
-
-  const code=document.getElementById('input-room-code').value.trim().toUpperCase();
-  const name=document.getElementById('input-player-name').value.trim();
-  const errBox=document.getElementById('entry-error');
+  const code = document.getElementById('input-room-code').value.trim().toUpperCase();
+  const name = document.getElementById('input-player-name').value.trim();
+  const errBox = document.getElementById('entry-error');
   if(!code||!name){ errBox.innerText="Заполните код комнаты и имя!"; errBox.classList.remove('hidden'); return; }
 
-  clientState.name=name; clientState.roomCode=code;
-  
-  /* Использование явной конфигурации параметров HTTPS соединения для предотвращения CORS-ошибок */
-  peer = new Peer(peerServerConfig);
+  clientState.name = name;
+  clientState.roomCode = code;
+  roomTopic = `dumat_quiz_v2/${code}`;
 
-  peer.on('open',()=>{
-    const conn=peer.connect("DUMAT-"+code,{reliable:true});
-    clientState.conn=conn;
-    let opened=false;
-    conn.on('open',()=>{
-      opened=true;
-      document.getElementById('screen-entry').classList.add('hidden');
-      document.getElementById('screen-player').classList.remove('hidden');
-      document.getElementById('player-my-name-display').innerText=name;
-      conn.send({type:"JOIN",name:name});
-    });
-    conn.on('data',(data)=>{ if(data.type==="PING") return; handleIncomingHostData(data); });
-    conn.on('close',()=>{ alert("Соединение потеряно! Обновите страницу."); });
-    conn.on('error',()=>{ if(!opened){ errBox.innerText="Комната не найдена."; errBox.classList.remove('hidden'); } });
+  mqttClient = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+    clientId: 'dumat_pl_' + Math.random().toString(16).substring(2, 10),
+    keepalive: 30
   });
-  
-  peer.on('error',(err)=>{ 
-    if (err.type === 'peer-unavailable') {
-      errBox.innerText = "Комната с таким кодом не найдена. Проверьте ТВ-экран.";
-    } else {
-      errBox.innerText = "Ошибка PeerJS: " + err.type;
+
+  mqttClient.on('connect', () => {
+    /* Подписка на персональный канал игрока и общий канал трансляции */
+    mqttClient.subscribe(`${roomTopic}/broadcast`);
+    mqttClient.subscribe(`${roomTopic}/player/${encodeURIComponent(name)}`);
+
+    document.getElementById('screen-entry').classList.add('hidden');
+    document.getElementById('screen-player').classList.remove('hidden');
+    document.getElementById('player-my-name-display').innerText = name;
+
+    sendToHost({ type: "JOIN", name: name });
+  });
+
+  mqttClient.on('message', (topic, message) => {
+    try {
+      const data = JSON.parse(message.toString());
+      handleIncomingHostData(data);
+    } catch (e) {
+      console.error(e);
     }
-    errBox.classList.remove('hidden'); 
+  });
+
+  mqttClient.on('error', (err) => {
+    errBox.innerText = "Ошибка подключения: " + err.message;
+    errBox.classList.remove('hidden');
   });
 }
 
-function handleIncomingPlayerData(conn,data){
+function sendToHost(msg){
+  if (mqttClient && mqttClient.connected) {
+    msg.senderName = clientState.name;
+    mqttClient.publish(`${roomTopic}/host`, JSON.stringify(msg));
+  }
+}
+
+function handleIncomingPlayerData(data){
   if(data.type==="JOIN"){
-    const existing=hostState.players.find(p=>p.name===data.name);
+    const existing = hostState.players.find(p=>p.name===data.name);
     if(existing){
-      existing.conn=conn; existing.peerId=conn.peer;
       logHostEvent(`${data.name} ПЕРЕПОДКЛЮЧИЛСЯ! Счёт сохранён: ${existing.score}`,"text-yellow-400 font-bold");
     } else {
-      hostState.players.push({id:hostState.players.length,name:data.name,score:0,conn:conn,peerId:conn.peer,alive:true});
+      hostState.players.push({id:hostState.players.length, name:data.name, score:0, alive:true});
       logHostEvent(`Игрок ${data.name} подключился!`,"text-cyan-400 font-bold");
     }
     broadcastStateToPlayers(); updateHostUI();
     return;
   }
-  const player=hostState.players.find(p=>p.peerId===conn.peer);
+
+  const player = hostState.players.find(p=>p.name===data.senderName);
   if(!player) return;
 
   if(data.type==="SUBMIT_ANSWER"){ hostState.answersReceived[player.id]=data.choice; logHostEvent(`${player.name} ответил.`,"text-zinc-500"); onAnswerLikeSubmitted(player); }
@@ -530,7 +498,6 @@ function handleIncomingPlayerData(conn,data){
 function handleIncomingHostData(data){
   if (!data) return;
 
-  /* Полностью безопасное чтение таблицы очков во избежание сбоя */
   if (data.scores) {
     clientState.score = data.scores[clientState.name] || 0;
   } else {
@@ -538,7 +505,6 @@ function handleIncomingHostData(data){
   }
   clientState.myId = data.myPlayerId;
 
-  /* Полностью безопасный вывод метаданных раунда во избежание сбоя JS-потока */
   const curRound = data.currentRound || 1;
   const rName = data.roundName || 'Раунд';
   const rDesc = data.roundDesc || '';
@@ -548,7 +514,6 @@ function handleIncomingHostData(data){
   document.getElementById('player-rules-title-text').innerText=rName.toUpperCase();
   document.getElementById('player-round-rules-preview').innerText=rDesc;
 
-  /* Исправление переключения полноэкранного вердикта (синхронное переключение hidden и flex) */
   const feedbackOverlay=document.getElementById('player-feedback-overlay');
   if (feedbackOverlay) {
     if(data.feedback && (data.feedback.affectsAll || data.feedback.player===clientState.name)){
@@ -562,7 +527,6 @@ function handleIncomingHostData(data){
     }
   }
 
-  /* Исправление переключения экрана темы */
   const playerReveal = document.getElementById('player-reveal-stage');
   if (playerReveal) {
     if (data.roundStage === 'reveal') {
@@ -576,7 +540,6 @@ function handleIncomingHostData(data){
     }
   }
 
-  /* Исправление переключения экрана подготовки ответа */
   const playerAnnounce = document.getElementById('player-announcement-stage');
   if (playerAnnounce) {
     if (data.roundStage === 'announcement') {
@@ -650,7 +613,6 @@ function renderPlayerPlayStage(data){
       extra = `<button onclick="sendToHost({type:'BUZZ'})" class="w-full bg-pink-600 hover:bg-pink-500 text-white font-black py-5 rounded-2xl border-b-8 border-pink-900 uppercase text-sm">🔔 Отвечаю сейчас!</button>`;
     }
 
-    /* РАУНД 8: Под подсказками черного ящика на экранах игроков отображаются активные подсказки */
     let revealedCluesHtml = '';
     if (type === 'blackbox') {
       const revealedClues = (data.clues || []).map((c, idx) => `
@@ -677,7 +639,6 @@ function renderPlayerPlayStage(data){
 
     if(rt.stage==='bidding'){
       if (myBid !== '') {
-        /* РАУНД 9: Блокировка кнопки и поля ставки после успешной отправки */
         box.innerHTML=`
           <div class="text-center space-y-3">
             <span class="text-4xl inline-block">🎰</span>
@@ -711,11 +672,9 @@ function renderPlayerPlayStage(data){
       showControllerStage('player-ctrl-special');
       const box=document.getElementById('player-ctrl-special');
       if(iAmActive){
-        /* Фикс уязвимости и сбоев includes на неопределенных массивах */
         box.innerHTML = `<div class="text-center space-y-3"><h4 class="neon-font text-sm text-cyan-400 uppercase">Выберите тему</h4>
         <div class="grid grid-cols-2 gap-2">${(rt.categories||[]).map((c,idx)=>`<button ${(rt.usedCats && Array.isArray(rt.usedCats) && rt.usedCats.includes(idx))?'disabled':''} onclick="sendToHost({type:'SELECT_CATEGORY',catIndex:${idx}})" class="pill-btn bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 px-2 rounded-xl border-b-4 border-indigo-900">${c}</button>`).join('')}</div></div>`;
       } else {
-        /* РАУНД 2: Ждущие игроки видят список доступных категорий, а не просто пустой экран */
         const topicsList = (rt.categories || []).map((c, idx) => `
           <div class="p-2.5 rounded-xl text-xs font-semibold ${(rt.usedCats && Array.isArray(rt.usedCats) && rt.usedCats.includes(idx)) ? 'bg-zinc-950/40 text-zinc-700 border border-zinc-900/30 line-through' : 'bg-zinc-900 border border-zinc-800 text-zinc-300'}">
             ${c}
@@ -903,7 +862,6 @@ function sendBid(){
   sendToHost({type:'SUBMIT_BID',bid:v});
 }
 function submitPlayerChoice(choiceIdx){ sendToHost({type:'SUBMIT_ANSWER',choice:choiceIdx}); showControllerStage('player-ctrl-done'); }
-function sendToHost(msg){ if(clientState.conn && clientState.conn.open) clientState.conn.send(msg); }
 
 /* =========================================================================
    ИМПОРТ И ПАРСИНГ JSON ОТ ИИ
@@ -1023,7 +981,6 @@ function runPlayerAnnouncement(){
   if(!activePlayer) return;
 
   const type=roundType(hostState.currentRound);
-  /* РАУНД 12: Быстрый темп для раунда Выживания */
   const announceDelay = (type === 'survivor') ? 1200 : 2500;
 
   document.getElementById('tv-player-announcement-stage').classList.remove('hidden');
@@ -1056,7 +1013,6 @@ function startOralTimer(seconds){
       clearInterval(countdownTimer);
       const type = roundType(hostState.currentRound);
       if(type==='survivor') survivorJudge(false);
-      /* РАУНД 7: Автоматическое завершение хода игрока при окончании 45 секунд таймера */
       if(type==='oral') oralFinishTurn();
     }
   },1000);
@@ -1168,7 +1124,6 @@ function getCurrentQuestionData(){
   if(type==='blind') {
     return hostState.roundQuestions.questions[hostState.rt.activeQIdx];
   }
-  /* РАУНД 10: Исправление ошибки Undefined во время трансляции подвопросов */
   if(type==='snowball') {
     const chainIdx = hostState.rt.chainIdx || 0;
     if(mainQ.chain && mainQ.chain[chainIdx]) {
@@ -1224,7 +1179,6 @@ function advanceAfterVerdict(){
     return;
   }
 
-  /* РАУНД 5: Ограничение Короля горы строго одним вопросом */
   if (type === 'king') {
     finishRoundAndAdvance();
     return;
@@ -1451,7 +1405,7 @@ function survivorJudge(isCorrect){
   while(!hostState.players[next].alive && guard<20){ next=(next+1)%hostState.players.length; guard++; }
   hostState.activePlayerIdx=next;
   hostState.activeQuestionIdx=(hostState.activeQuestionIdx+1)%hostState.roundQuestions.questions.length;
-  runPlayerAnnouncement(); // Раунд 12: Быстрый запуск анонса
+  runPlayerAnnouncement();
 }
 
 function auctionCloseBidding(){
@@ -1501,7 +1455,6 @@ function updateHostUI(){
   renderHostTVStage(config);
 }
 
-/* ДИНАМИЧЕСКИЙ МОНТАЖ ПОЛЕЙ ВВОДА ДЛЯ РАУНДОВ */
 function renderHostConfigurator() {
   const container = document.getElementById('host-dynamic-configurator');
   if (!container) return;
@@ -1577,7 +1530,6 @@ function renderHostRoundControls(){
   if (!box) return;
   const type=roundType(hostState.currentRound);
 
-  /* Перенос кнопки Начать игру в мобильный пульт хоста */
   if (hostState.roundStage === 'lobby') {
     box.innerHTML = `
       <div class="space-y-2">
@@ -1670,7 +1622,6 @@ function renderHostTVStage(config){
     return; 
   }
 
-  /* Исправление: Экран лобби ТВ-экрана никогда не становится черным до старта игры */
   if(hostState.roundStage==='lobby'){ 
     lobbyStage.classList.remove('hidden'); 
     return; 
@@ -1731,7 +1682,6 @@ function renderHostTVStage(config){
     return;
   }
   if(type==='oral'||type==='blackbox'||type==='survivor'){
-    /* РАУНД 7/12: Вырезание правильного устного ответа в скобках на ТВ экране */
     let rawQ = getCurrentQuestionData()?.q||'';
     document.getElementById('tv-question-text').innerText=cleanOralQuestion(rawQ);
 
@@ -1794,7 +1744,7 @@ function updateScoreboardAndControllers(){ updateHostUI(); broadcastStateToPlaye
 function hostForceStartFromLobby(){
   if(hostState.players.length===0){ alert("Дождитесь хотя бы одного подключения!"); return; }
   hostState.roundStage='rules';
-  updateScoreboardAndControllers(); // Принудительная отправка изменений
+  updateScoreboardAndControllers();
 }
 
 function showFinalVictoryPodium(){
@@ -1820,11 +1770,9 @@ function logHostEvent(text,colorClass="text-zinc-400"){
   logBox.scrollTop=logBox.scrollHeight;
 }
 
-/* ГЕНЕРАТОР ПРОМПТОВ ПОД ДАННЫЕ РАУНДА */
 function copyRoundPrompt(){
   const rNum = hostState.currentRound;
   const pCount = hostState.players.length || 4;
-  const catCount = rNum === 15 ? pCount * 2 : (rNum === 2 ? 4 : pCount);
 
   let themeVal = "";
   let customTopicsVal = "";
@@ -1848,7 +1796,7 @@ function copyRoundPrompt(){
     const topics = customTopicsVal ? customTopicsVal.split(',').map(s=>s.trim()) : ["Кино", "Космос", "Еда", "Спорт"];
     promptSpec = `Массив "questions" ровно из 4 объектов (каждый соответствует теме из списка [${topics.join(', ')}]): "category" (название темы из списка), "q" (вопрос средней сложности), "a" (4 варианты ответа), "c" (индекс верного ответа от 0 до 3).`;
   } else if (rNum === 3) {
-    promptSpec = `Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме ${themeVal}, например: восстановить хронологию событий), "a" (4 варианта ответа, которые ДОЛЖНЫ быть в правильном порядке. a[0] идет первым, a[1] вторым, a[2] третьим, a[3] четвертым), "c" (0).`;
+    promptSpec = `Массив "questions" из {pCount} объектов: "q" (вопрос на упорядочивание по теме ${themeVal}), "a" (4 варианта ответа, которые ДОЛЖНЫ быть в правильном порядке. a[0] идет первым, a[1] вторым, a[2] третьим, a[3] четвертым), "c" (0).`;
   } else if (rNum === 4) {
     promptSpec = `Массив "questions" ровно из ${pCount} объектов по теме ${themeVal}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины — неверного, но крайне правдоподобного ответа, обязательно отличается от c).`;
   } else if (rNum === 5) {
@@ -1859,7 +1807,7 @@ function copyRoundPrompt(){
     promptSpec = `Массив "questions" из 12 объектов для быстрого устного блица по теме ${themeVal}, без вариантов ответов: "q" (короткий вопрос и ответ в скобках, например "Первый космонавт Земли? (Гагарин)").`;
   } else if (rNum === 8) {
     const itemText = secretItemVal ? `конкретно про предмет "${secretItemVal}"` : `какой-то интересный предмет в контексте темы ${themeVal}`;
-    promptSpec = `Массив "questions" ровно из ${pCount} объектов: "q" (главный вопрос-загадка по теме ${themeVal}, например: "Угадайте предмет по подсказкам"), "clues" (массив ровно из 4 подсказок ${itemText}, идущих от очень сложной/размытой к очевидной), "a" (4 варианта ответа), "c" (индекс верного).`;
+    promptSpec = `Массив "questions" ровно из ${pCount} объектов: "q" (главный вопрос-загадка по теме ${themeVal}), "clues" (массив ровно из 4 подсказок ${itemText}, идущих от очень сложной к очевидной), "a" (4 варианта ответа), "c" (индекс верного).`;
   } else if (rNum === 9) {
     promptSpec = `Массив "questions" из 1 объекта: "q" (сложный вопрос с глубокой логикой по теме ${themeVal}), "a" (4 варианта), "c" (индекс верного).`;
   } else if (rNum === 10) {
@@ -1893,6 +1841,8 @@ function copyRoundPrompt(){
    ТРАНСЛЯЦИЯ СОСТОЯНИЯ ИГРОКАМ
 ========================================================================= */
 function broadcastStateToPlayers(){
+  if (!mqttClient || !mqttClient.connected) return;
+
   const scores={}; hostState.players.forEach(p=>{ scores[p.name]=p.score; });
   const hasAnswered=[];
   Object.keys(hostState.answersReceived).forEach(pId=>{ const pl=hostState.players.find(p=>p.id==pId); if(pl) hasAnswered.push(pl.name); });
@@ -1905,7 +1855,6 @@ function broadcastStateToPlayers(){
       optionsArray=qData.a||[]; 
       cluesArray=qData.clues||[];
 
-      /* Вырезание правильного ответа для смартфонов игроков в устных раундах */
       const type = roundType(hostState.currentRound);
       if (type === 'oral' || type === 'survivor') {
         currentQuestionText = cleanOralQuestion(currentQuestionText);
@@ -1916,31 +1865,32 @@ function broadcastStateToPlayers(){
   const podium=hostState.gameOver?[...hostState.players].sort((a,b)=>b.score-a.score):[];
 
   hostState.players.forEach(p=>{
-    if(p.conn && p.conn.open){
-      p.conn.send({
-        type:"STATE_UPDATE",
-        currentRound:hostState.currentRound,
-        roundStage:hostState.roundStage,
-        roundType:roundType(hostState.currentRound),
-        roundName:ROUND_DETAILS[hostState.currentRound].name,
-        roundDesc:ROUND_DETAILS[hostState.currentRound].rules,
-        theme:hostState.theme,
-        scores:scores,
-        hasAnswered:hasAnswered,
-        questionText:currentQuestionText,
-        options:optionsArray,
-        clues:cluesArray, // РАУНД 8: Трансляция подсказок
-        activePlayerId: hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].id:null,
-        activePlayerName: hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].name:"",
-        myPlayerId:p.id,
-        feedback:hostState.feedbackData,
-        showOptions:hostState.showOptions,
-        rt:hostState.rt,
-        playersList:hostState.players.map(pl=>({id:pl.id,name:pl.name,score:pl.score,alive:pl.alive})),
-        gameOver:hostState.gameOver,
-        podium:podium
-      });
-    }
+    const payload = {
+      type:"STATE_UPDATE",
+      currentRound:hostState.currentRound,
+      roundStage:hostState.roundStage,
+      roundType:roundType(hostState.currentRound),
+      roundName:ROUND_DETAILS[hostState.currentRound].name,
+      roundDesc:ROUND_DETAILS[hostState.currentRound].rules,
+      theme:hostState.theme,
+      scores:scores,
+      hasAnswered:hasAnswered,
+      questionText:currentQuestionText,
+      options:optionsArray,
+      clues:cluesArray,
+      activePlayerId: hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].id:null,
+      activePlayerName: hostState.players[hostState.activePlayerIdx]?hostState.players[hostState.activePlayerIdx].name:"",
+      myPlayerId:p.id,
+      feedback:hostState.feedbackData,
+      showOptions:hostState.showOptions,
+      rt:hostState.rt,
+      playersList:hostState.players.map(pl=>({id:pl.id,name:pl.name,score:pl.score,alive:pl.alive})),
+      gameOver:hostState.gameOver,
+      podium:podium
+    };
+
+    /* Публикация состояния в уникальный топик конкретного игрока */
+    mqttClient.publish(`${roomTopic}/player/${encodeURIComponent(p.name)}`, JSON.stringify(payload));
   });
 }
 </script>
