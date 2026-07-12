@@ -361,7 +361,7 @@ const ROUND_PROMPTS_FOR_AI = {
   6:`Массив "questions" из {pCount} объектов по теме {theme}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного).`,
   7:`Массив "questions" из 12 объектов для устного блица по теме {theme} (без вариантов): "q" (короткий вопрос и ответ в скобках, например: "Столица Франции? (Париж)").`,
   8:`Массив "questions" из {pCount} объектов: "q" (вопрос "Угадайте секретный объект по подсказкам" по теме {theme}), "clues" (массив ровно из 4 подсказок {secretInfo} от сложной к простой), "a" (4 варианта финального ответа), "c" (индекс верного).`,
-  9:`Массив "questions" из 1 объекта: "q" (сложный вопрос с глубокой логикой по теме ${theme}), "a" (4 варианты), "c" (индекс верного).`,
+  9:`Массив "questions" из 1 объекта: "q" (сложный вопрос с глубокой логикой по теме {theme}), "a" (4 варианты), "c" (индекс верного).`,
   10:`Массив "questions" из {pCount} объектов: "chain" (массив из 3 объектов цепочки вопросов по теме {theme} возрастающей сложности: 1-й легкий, 2-й средний, 3-й сложный. У каждого: "q" (вопрос), "a" (4 варианта), "c" (индекс верного)).`,
   11:`Массив "questions" из 12 простых и быстрых вопросов по теме {theme}: "q", "a" (4 варианта), "c" (индекс верного).`,
   12:`Массив "questions" из 12 быстрых устных вопросов по теме {theme}: "q" (вопрос и краткий ответ в скобках).`,
@@ -398,7 +398,7 @@ function cleanOralQuestion(qStr) {
 }
 
 /* =========================================================================
-   ПОДКЛЮЧЕНИЕ / ЛОББИ
+   ПОДКЛЮЧЕНИЕ / ЛОББИ (Фикс Render HTTPS)
 ========================================================================= */
 function initHostLobby(){
   hostState.role='host';
@@ -406,7 +406,15 @@ function initHostLobby(){
   document.getElementById('screen-host').classList.remove('hidden');
 
   const rawCode=Math.floor(1000+Math.random()*9000).toString();
-  peer=new Peer("DUMAT-"+rawCode);
+  
+  /* Явное принудительное защищенное WSS соединение */
+  peer=new Peer("DUMAT-"+rawCode, {
+    host: "0.peerjs.com",
+    port: 443,
+    path: "/",
+    secure: true,
+    pingInterval: 5000
+  });
 
   peer.on('open',(id)=>{
     hostState.roomCode=id.replace("DUMAT-","");
@@ -414,11 +422,11 @@ function initHostLobby(){
     logHostEvent(`Лобби создано! Код: ${hostState.roomCode}`,"text-cyan-400 font-bold");
   });
   peer.on('error',(err)=>{
+    console.error(err);
+    logHostEvent(`Ошибка соединения: ${err.type}`,"text-red-400");
     if(err.type==='unavailable-id'){
       logHostEvent("Код занят, пересоздаём...","text-red-400");
       setTimeout(initHostLobby,300);
-    } else {
-      logHostEvent("Ошибка сети: "+err.type,"text-red-400");
     }
   });
   peer.on('connection',(conn)=>{
@@ -443,7 +451,16 @@ function joinAsPlayer(){
   if(!code||!name){ errBox.innerText="Заполните код комнаты и имя!"; errBox.classList.remove('hidden'); return; }
 
   clientState.name=name; clientState.roomCode=code;
-  peer=new Peer();
+  
+  /* Явное принудительное защищенное WSS соединение */
+  peer=new Peer({
+    host: "0.peerjs.com",
+    port: 443,
+    path: "/",
+    secure: true,
+    pingInterval: 5000
+  });
+
   peer.on('open',()=>{
     const conn=peer.connect("DUMAT-"+code,{reliable:true});
     clientState.conn=conn;
@@ -492,7 +509,7 @@ function handleIncomingPlayerData(conn,data){
 function handleIncomingHostData(data){
   if (!data) return;
 
-  /* Безопасное чтение таблицы очков */
+  /* Полностью безопасное чтение таблицы очков */
   if (data.scores) {
     clientState.score = data.scores[clientState.name] || 0;
   } else {
@@ -500,7 +517,7 @@ function handleIncomingHostData(data){
   }
   clientState.myId = data.myPlayerId;
 
-  /* Безопасный вывод метаданных раунда во избежание сбоя JS-потока */
+  /* Полностью безопасный вывод метаданных раунда во избежание сбоя JS-потока */
   const curRound = data.currentRound || 1;
   const rName = data.roundName || 'Раунд';
   const rDesc = data.roundDesc || '';
@@ -679,7 +696,7 @@ function renderPlayerPlayStage(data){
       } else {
         /* РАУНД 2: Ждущие игроки видят список доступных категорий, а не просто пустой экран */
         const topicsList = (rt.categories || []).map((c, idx) => `
-          <div class="p-2.5 rounded-xl text-xs font-semibold ${rt.usedCats && rt.usedCats.includes(idx) ? 'bg-zinc-950/40 text-zinc-700 border border-zinc-900/30 line-through' : 'bg-zinc-900 border border-zinc-800 text-zinc-300'}">
+          <div class="p-2.5 rounded-xl text-xs font-semibold ${rt.usedCats && Array.isArray(rt.usedCats) && rt.usedCats.includes(idx) ? 'bg-zinc-950/40 text-zinc-700 border border-zinc-900/30 line-through' : 'bg-zinc-900 border border-zinc-800 text-zinc-300'}">
             ${c}
           </div>`).join('');
         box.innerHTML=`
@@ -1768,7 +1785,7 @@ function updateScoreboardAndControllers(){ updateHostUI(); broadcastStateToPlaye
 function hostForceStartFromLobby(){
   if(hostState.players.length===0){ alert("Дождитесь хотя бы одного подключения!"); return; }
   hostState.roundStage='rules';
-  updateHostUI(); broadcastStateToPlayers();
+  updateScoreboardAndControllers(); // Принудительная отправка изменений
 }
 
 function showFinalVictoryPodium(){
@@ -1826,7 +1843,7 @@ function copyRoundPrompt(){
   } else if (rNum === 4) {
     promptSpec = `Массив "questions" ровно из ${pCount} объектов по теме ${themeVal}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного), "mine" (индекс ловушки/мины — неверного, но крайне правдоподобного ответа, обязательно отличается от c).`;
   } else if (rNum === 5) {
-    promptSpec = `Массив "questions" ровно из 1 объекта по теме ${themeVal}: "q" (вопрос средней сложности), "a" (4 варианта), "c" (индекс верного ответа от 0 до 3).`;
+    promptSpec = `Массив "questions" из 1 объекта по теме ${themeVal}: "q" (вопрос средней сложности), "a" (4 варианта), "c" (индекс верного ответа от 0 до 3).`;
   } else if (rNum === 6) {
     promptSpec = `Массив "questions" ровно из ${pCount} объектов по теме ${themeVal}: "q" (вопрос), "a" (4 варианта), "c" (индекс верного ответа от 0 до 3).`;
   } else if (rNum === 7) {
