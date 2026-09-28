@@ -1,10 +1,12 @@
 let modeIntroTimer = null;
 let suspenseTimer = null;
 let verdictTimer = null;
+let regularTurnPointer = 0; // Сохранение честной очерёдности ходов
 
 function createRoomAsHost() {
   playSound('click');
   gameState.isHost = true;
+  regularTurnPointer = 0;
 
   const rawCode = Math.random().toString(36).substring(2, 6).toUpperCase();
   gameState.roomCode = rawCode;
@@ -117,7 +119,7 @@ function hostHandleIncomingMessage(data) {
   if (!roundData) return;
   const type = roundData.type || 'classic';
 
-  // 1. ВЫБОР РИСКА (СУНДУКИ С ЯВНЫМИ БАЛЛАМИ)
+  // 1. ВЫБОР РИСКА
   if (data.type === "BLIND_CHEST_CHOSEN") {
     const chests = roundData.chests || [
       { value: 1, difficulty: "Простой", q: roundData.q, a: roundData.a, c: 0 },
@@ -149,7 +151,7 @@ function hostHandleIncomingMessage(data) {
     return;
   }
 
-  // 3. АУКЦИОН
+  // 3. АУКЦИОН СТАВОК (НЕ ТРАТИТ ОЧЕРЕДЬ СЛЕДУЮЩЕГО ИГРОКА)
   if (data.type === "SUBMIT_BID") {
     gameState.rt.bids = gameState.rt.bids || {};
     gameState.rt.bids[player.id] = data.bid;
@@ -181,7 +183,7 @@ function hostHandleIncomingMessage(data) {
     return;
   }
 
-  // 5. СНЕЖНЫЙ КОМ (РЕШЕНИЕ: ЗАБРАТЬ БАНК ИЛИ ИДТИ ДАЛЬШЕ)
+  // 5. СНЕЖНЫЙ КОМ
   if (data.type === "SNOWBALL_DECIDE") {
     if (data.action === "BANK") {
       player.score += (gameState.rt.bankedPoints || 0);
@@ -196,34 +198,34 @@ function hostHandleIncomingMessage(data) {
     return;
   }
 
-  // 6. РАУНД СОЮЗА
+  // 6. РАУНД СОЮЗА: ГОЛОСУЮТ ВСЕ ИГРОКИ
   if (data.type === "SUBMIT_UNION_VOTE") {
     gameState.rt.votes = gameState.rt.votes || {};
     gameState.rt.votes[player.id] = data.choice;
 
     if (Object.keys(gameState.rt.votes).length >= gameState.players.length) {
       const tally = [0, 0, 0, 0];
-      Object.values(gameState.rt.votes).forEach(c => { if(tally[c] !== undefined) tally[c]++; });
-      let maxVotes = -1, choice = 0;
-      tally.forEach((v, idx) => { if(v > maxVotes) { maxVotes = v; choice = idx; } });
+      Object.values(gameState.rt.votes).forEach(c => { if (tally[c] !== undefined) tally[c]++; });
+      let maxVotes = -1, teamChoice = 0;
+      tally.forEach((v, idx) => { if (v > maxVotes) { maxVotes = v; teamChoice = idx; } });
 
-      const isCorrect = choice === roundData.c;
+      const isCorrect = teamChoice === roundData.c;
       gameState.players.forEach(p => {
         p.score = isCorrect ? p.score + 2 : Math.max(0, p.score - 2);
       });
-      hostTriggerVerdict("Команда", isCorrect, null, roundData.a ? roundData.a[roundData.c] : '');
+      hostTriggerVerdict("Команда", isCorrect, isCorrect ? "Команда ответила верно! (+2 б.)" : "Команда ошиблась! (-2 б.)", roundData.a ? roundData.a[roundData.c] : '');
     }
     return;
   }
 
-  // 7. ВЕТО И ВА-БАНК
+  // 7. СУПЕР-ФИНАЛ: ВЕТО И ВА-БАНК (ОТВЕЧАЮТ ВСЕ!)
   if (data.type === "VETO_BAN_CATEGORY") {
     gameState.rt.banned = gameState.rt.banned || [];
     if (!gameState.rt.banned.includes(data.catIndex)) gameState.rt.banned.push(data.catIndex);
     const cats = roundData.categories || [];
     if (gameState.rt.banned.length >= cats.length - 1) {
       let finalIdx = 0;
-      cats.forEach((_, idx) => { if(!gameState.rt.banned.includes(idx)) finalIdx = idx; });
+      cats.forEach((_, idx) => { if (!gameState.rt.banned.includes(idx)) finalIdx = idx; });
       gameState.rt.finalCatIdx = finalIdx;
       gameState.rt.phase = 'betting';
       gameState.rt.bets = {};
@@ -259,7 +261,7 @@ function hostHandleIncomingMessage(data) {
     return;
   }
 
-  // 8. СТАНДАРТНЫЙ ОТВЕТ (КЛАССИКА, МИНЫ, СНЕЖНЫЙ КОМ)
+  // 8. СТАНДАРТНЫЙ ОТВЕТ
   if (data.type === "SUBMIT_ANSWER") {
     gameState.rt.suspenseChoice = data.choice;
     SoundManager.playTensionTick();
@@ -345,7 +347,6 @@ function hostHandleIncomingMessage(data) {
           gameState.players.forEach(p => { if (p.id !== player.id) p.score += 1; });
         }
       } else if (type === 'sabotage' && isCorrect) {
-        // СОЛО-РЕЖИМ ЗЛОГО КВИЗА (не зависает, если нет соперников)
         const others = gameState.players.filter(p => p.id !== player.id);
         if (others.length === 0) {
           player.score += 1;
@@ -418,7 +419,7 @@ function hostStartMasterGame() {
     return;
   }
 
-  // game-in.mp3 НЕ ВЫЗЫВАЕТСЯ!
+  regularTurnPointer = 0;
   gameState.roundStage = 'countdown';
   gameState.rt.countdown = 3;
   hostBroadcastState();
@@ -472,11 +473,17 @@ function hostLaunchRound(num) {
     gameState.rt.phase = 'banning';
   }
 
+  // ОЧЕРЁДНОСТЬ ХОДОВ: АУКЦИОН, СОЮЗ И ФИНАЛ НЕ СБИВАЮТ ХОД ИГРОКА!
   if (type === 'king') {
     const leader = gameState.players.reduce((best, p) => p.score > best.score ? p : best, gameState.players[0]);
     gameState.activePlayerIdx = gameState.players.findIndex(p => p.id === leader.id);
+  } else if (type === 'auction' || type === 'union' || type === 'veto') {
+    // В этих режимах играют все или ставки — обычный счетчик не сдвигается
+    gameState.activePlayerIdx = regularTurnPointer % Math.max(1, gameState.players.length);
   } else {
-    gameState.activePlayerIdx = (num - 1) % Math.max(1, gameState.players.length);
+    // Обычные раунды честно двигают очередь
+    gameState.activePlayerIdx = regularTurnPointer % Math.max(1, gameState.players.length);
+    regularTurnPointer++;
   }
 
   const isSpecial = type !== 'classic';

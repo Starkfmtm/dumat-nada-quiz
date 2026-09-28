@@ -124,7 +124,6 @@ function showToast(message, isError = false) {
   }, 2800);
 }
 
-// ПОЛНЫЙ И ЧИСТЫЙ СБРОС ПРИ ВЫХОДЕ В МЕНЮ
 function goBackToMenu() {
   window.__roomVerified = false;
   clearInterval(window.__joinInterval);
@@ -153,7 +152,6 @@ function goBackToMenu() {
 
   try { localStorage.removeItem('dumat_session'); } catch (e) {}
 
-  // ПОЛНАЯ ОЧИСТКА СОСТОЯНИЯ ТЕМ И ИГРЫ
   gameState.isHost = false;
   gameState.roomCode = null;
   gameState.players = [];
@@ -329,12 +327,11 @@ function renderMenuAvatar() {
 function cycleAvatar(direction) {
   playSound('boing');
   const pack = window.AVATAR_PACK || [];
-  const total = pack.length || 12;
+  const total = pack.length || 16;
   gameState.selectedAvatarIdx = (gameState.selectedAvatarIdx + direction + total) % total;
   renderMenuAvatar();
 }
 
-// КЛИК "НАЧАТЬ" -> ЗАПУСК game-in.mp3 И ПЕРЕХОД КРУЖКОМ
 function handleMainActionClick() {
   const nameInput = document.getElementById('input-player-name');
   const name = nameInput ? nameInput.value.trim() : '';
@@ -350,7 +347,7 @@ function handleMainActionClick() {
     return;
   }
 
-  // ЗАПУСК game-in.mp3 В МОМЕНТ ПЕРЕХОДА
+  // Звук перехода game-in.mp3 играет строго здесь
   if (window.SoundManager) {
     window.SoundManager.playGameIn();
   }
@@ -451,9 +448,12 @@ function copyMasterGamePrompt() {
 
 ТЕМЫ ИЗ КОРЗИНЫ ИГРОКОВ: [${themes}].
 
-ВАЖНЕЙШЕЕ ТРЕБОВАНИЕ: НАРАСТАЮЩАЯ СЛОЖНОСТЬ (1-8 легкие, 9-16 средние, 17-24 хардкор, 25 финал).
-Ритм: каждые 2 раунда classic, 3-й — спец-режим:
-1,2: classic | 3: blind (chests: [{value:1, difficulty:"Легкий", q, a, c}, {value:2, difficulty:"Средний", q, a, c}, {value:3, difficulty:"Хардкор", q, a, c}]) | 4,5: classic | 6: order (items: 4 шт по порядку) | 7,8: classic | 9: mine (a: 9 шт, c: верный, mines: [2 индекса]) | 10,11: classic | 12: king | 13,14: classic | 15: sabotage | 16,17: classic | 18: auction | 19,20: classic | 21: snowball (chain: [{q,a,c} 3 шт]) | 22,23: classic | 24: union | 25: veto (categories: 6 шт).`;
+ВАЖНЕЙШИЕ ТРЕБОВАНИЯ:
+1. ДЛИНА ВАРИАНТОВ ОТВЕТОВ: СТРОГО НЕ БОЛЕЕ 15 СИМВОЛОВ КАЖДЫЙ ВАРИАНТ! (Только краткие слова, имена, числа, короткие термины).
+2. НАРАСТАЮЩАЯ СЛОЖНОСТЬ (1-8 легкие, 9-16 средние, 17-24 хардкор, 25 финал).
+
+Ритм раундов:
+1,2: classic | 3: blind (chests: [{value:1, difficulty:"Простой", q, a, c}, {value:2, difficulty:"Средний", q, a, c}, {value:3, difficulty:"Хардкор", q, a, c}]) | 4,5: classic | 6: order (items: 4 шт по порядку) | 7,8: classic | 9: mine (a: 9 шт, c: верный, mines: [2 индекса]) | 10,11: classic | 12: king | 13,14: classic | 15: sabotage | 16,17: classic | 18: auction | 19,20: classic | 21: snowball (chain: [{q,a,c} 3 шт]) | 22,23: classic | 24: union | 25: veto (categories: 6 шт с вопросами внутри каждого).`;
 
   navigator.clipboard.writeText(promptText).then(() => {
     playSound('correct');
@@ -461,29 +461,143 @@ function copyMasterGamePrompt() {
   }).catch(() => prompt("Скопируйте промпт:", promptText));
 }
 
+// ==========================================================
+// «УМНЫЙ ПАРСЕР-ЛЕКАРЬ» ДЛЯ ЛЮБОГО JSON ОТ НЕЙРОСЕТЕЙ
+// Исправляет опечатки вроде ":," и понимает любые названия полей
+// ==========================================================
 function parseMasterJSON() {
   const raw = document.getElementById('host-ai-textarea').value.trim();
   if (!raw) { showToast("Вставьте JSON в поле!", true); return; }
 
   try {
     let cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+    // 1. АВТО-ЛЕЧЕНИЕ ТИПИЧНЫХ ОШИБОК НЕЙРОСЕТЕЙ (ПУСТЫЕ ДВОЕТОЧИЯ)
+    cleaned = cleaned.replace(/:\s*,/g, ': null,');
+    cleaned = cleaned.replace(/:\s*\]/g, ': null]');
+    cleaned = cleaned.replace(/:\s*\}/g, ': null}');
+
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1) cleaned = cleaned.substring(firstBrace, lastBrace + 1);
 
     const parsed = JSON.parse(cleaned);
-    const rounds = parsed.rounds || [];
-    if (!Array.isArray(rounds) || !rounds.length) { showToast("Нет массива rounds в JSON!", true); return; }
+    let rawRounds = parsed.rounds || parsed.data || [];
 
-    gameState.roundsData = rounds;
-    gameState.totalRounds = rounds.length;
+    if (!Array.isArray(rawRounds) || !rawRounds.length) {
+      showToast("В JSON нет массива rounds!", true);
+      return;
+    }
+
+    // 2. УНИВЕРСАЛЬНАЯ НОРМАЛИЗАЦИЯ ПОЛЕЙ ДЛЯ ИГРЫ
+    const normalized = rawRounds.map((r, idx) => {
+      const type = (r.type || 'classic').toLowerCase();
+      const theme = r.theme || r.topic || r.category || `Раунд ${idx + 1}`;
+      const q = r.q || r.question || '';
+      let a = r.a || r.options || r.elements || [];
+      let c = r.c !== undefined ? r.c : (r.correct !== undefined ? r.correct : 0);
+
+      // Если ответ указан словом ("answer": "Колобок"), вычисляем его индекс
+      if (r.answer && typeof r.answer === 'string' && Array.isArray(a) && a.length) {
+        const found = a.findIndex(opt => opt.trim().toLowerCase() === r.answer.trim().toLowerCase());
+        if (found !== -1) c = found;
+      }
+
+      const item = {
+        roundNum: r.roundNum || r.round_number || idx + 1,
+        type: type,
+        theme: theme,
+        q: q,
+        a: a,
+        c: parseInt(c, 10) || 0
+      };
+
+      // Нормализация режима "Слепой выбор / Выбор риска"
+      if (type === 'blind' && r.chests) {
+        item.chests = r.chests.map((ch, chIdx) => {
+          let chA = ch.a || ch.options || ["A", "B", "C", "D"];
+          let chC = ch.c !== undefined ? ch.c : 0;
+          if (ch.answer && typeof ch.answer === 'string' && Array.isArray(chA)) {
+            const found = chA.findIndex(opt => opt.trim().toLowerCase() === ch.answer.trim().toLowerCase());
+            if (found !== -1) chC = found;
+          }
+          return {
+            value: ch.value || (chIdx + 1),
+            difficulty: ch.difficulty || (chIdx === 0 ? "Простой" : (chIdx === 1 ? "Средний" : "Хардкор")),
+            q: ch.q || ch.question || `Вопрос на ${chIdx + 1} балл`,
+            a: chA,
+            c: parseInt(chC, 10) || 0
+          };
+        });
+      }
+
+      // Нормализация режима "Хронология (order)"
+      if (type === 'order') {
+        if (Array.isArray(r.items)) {
+          item.items = r.items.map(it => (typeof it === 'object' && it.text) ? it.text : String(it));
+        } else if (Array.isArray(a) && a.length) {
+          item.items = [...a];
+        }
+      }
+
+      // Нормализация режима "Минное поле (mine)"
+      if (type === 'mine') {
+        item.mines = Array.isArray(r.mines) && r.mines.length ? r.mines : [1, 4];
+      }
+
+      // Нормализация режима "Снежный ком (snowball)"
+      if (type === 'snowball' && Array.isArray(r.chain)) {
+        item.chain = r.chain.map(ch => {
+          let chA = ch.a || ch.options || ["A", "B", "C", "D"];
+          let chC = ch.c !== undefined ? ch.c : 0;
+          if (ch.answer && typeof ch.answer === 'string' && Array.isArray(chA)) {
+            const found = chA.findIndex(opt => opt.trim().toLowerCase() === ch.answer.trim().toLowerCase());
+            if (found !== -1) chC = found;
+          }
+          return {
+            q: ch.q || ch.question || '',
+            a: chA,
+            c: parseInt(chC, 10) || 0
+          };
+        });
+      }
+
+      // Нормализация режима "Вето и Ва-банк (veto)"
+      if (type === 'veto') {
+        let cats = r.categories || [];
+        if (Array.isArray(cats)) {
+          item.categories = cats.map(cat => {
+            if (typeof cat === 'string') {
+              return {
+                name: cat,
+                q: `ФИНАЛЬНЫЙ ВОПРОС ПО ТЕМЕ «${cat.toUpperCase()}»!`,
+                a: ["Вариант А", "Вариант Б", "Вариант В", "Вариант Г"],
+                c: 0
+              };
+            }
+            return {
+              name: cat.name || cat.topic || "Финал",
+              q: cat.q || cat.question || "Финальный вопрос",
+              a: cat.a || cat.options || ["A", "B", "C", "D"],
+              c: cat.c !== undefined ? cat.c : 0
+            };
+          });
+        }
+      }
+
+      return item;
+    });
+
+    gameState.roundsData = normalized;
+    gameState.totalRounds = normalized.length;
     playSound('correct');
-    showToast(`✅ Загружено ${rounds.length} раундов от ИИ!`);
+    showToast(`✅ Загружено ${normalized.length} раундов (формат вылечен)!`);
     closeHostAIModal();
     hostBroadcastState();
   } catch(e) {
+    console.error("JSON parse error:", e);
     playSound('wrong');
-    showToast("Ошибка синтаксиса JSON!", true);
+    showToast("Ошибка в JSON! Проверьте синтаксис.", true);
   }
 }
 

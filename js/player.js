@@ -68,7 +68,6 @@ function handleInboundClientData(data) {
     window.__roomVerified = true;
     clearInterval(window.__joinInterval);
 
-    // СБРОС БЛОКИРОВКИ ОТВЕТА ДЛЯ НОВОГО ВОПРОСА
     if (data.currentRound !== gameState.lastRoundSeen || (data.roundStage === 'play' && !data.feedback)) {
       gameState.lastRoundSeen = data.currentRound;
       gameState.hasAnsweredCurrent = false;
@@ -97,12 +96,12 @@ function handleInboundClientData(data) {
 // ГЛАВНЫЙ ИГРОВОЙ РЕНДЕР
 // ==========================================================
 function renderGameUI() {
-  // 1. ОВЕРЛЕЙ ВЕРДИКТА
+  // 1. КОМФОРТНЫЙ ТЁМНЫЙ ОВЕРЛЕЙ ВЕРДИКТА
   const fb = document.getElementById('game-feedback-overlay');
   if (fb) {
     if (gameState.feedbackData) {
       fb.classList.remove('hidden');
-      fb.classList.add('flex', gameState.feedbackData.isCorrect ? 'bg-[#34C759]' : 'bg-[#FF3B30]');
+      fb.classList.add('flex', gameState.feedbackData.isCorrect ? 'verdict-dark-correct' : 'verdict-dark-wrong');
       document.getElementById('feedback-icon').innerText = gameState.feedbackData.isCorrect ? "✅" : "❌";
       document.getElementById('feedback-title').innerText = gameState.feedbackData.customText || (gameState.feedbackData.isCorrect ? `${gameState.feedbackData.playerName}: ВЕРНО!` : `${gameState.feedbackData.playerName}: ОШИБКА!`);
 
@@ -116,14 +115,17 @@ function renderGameUI() {
       }
     } else {
       fb.classList.add('hidden');
-      fb.classList.remove('flex', 'bg-[#34C759]', 'bg-[#FF3B30]');
+      fb.classList.remove('flex', 'verdict-dark-correct', 'verdict-dark-wrong');
     }
   }
 
   const roundData = gameState.roundsData[gameState.currentRound - 1] || {};
-  const isMyTurn = gameState.activePlayerClientId === myClientId || 
-                   roundData.type === 'union' || 
-                   (roundData.type === 'auction' && gameState.rt?.stage === 'bidding');
+  
+  // В РАУНДЕ СОЮЗА И ФИНАЛЕ КНОПКИ ДОСТУПНЫ ВСЕМ ИГРОКАМ!
+  const isAllTurn = roundData.type === 'union' || 
+                    (roundData.type === 'auction' && gameState.rt?.stage === 'bidding') ||
+                    (roundData.type === 'veto');
+  const isMyTurn = isAllTurn || gameState.activePlayerClientId === myClientId;
 
   const rInd = document.getElementById('round-indicator');
   if (rInd) {
@@ -245,7 +247,7 @@ function renderGameUI() {
     return;
   }
 
-  // 2. ЗАСТАВКА ПРАВИЛ С ЧИСТЫМ 5-СЕКУНДНЫМ CSS ТАЙМЕРОМ
+  // 2. ЗАСТАВКА ПРАВИЛ
   if (gameState.roundStage === 'mode_intro') {
     vIntro?.classList.remove('hidden');
     const mInfo = (window.GAME_MODES_INFO && window.GAME_MODES_INFO[roundData.type]) || { icon: "🎯", name: "Классика", rules: "Внимание на экран!" };
@@ -256,13 +258,13 @@ function renderGameUI() {
     const pEl = document.getElementById('intro-progress');
     if (pEl) {
       pEl.classList.remove('intro-timer-running');
-      void pEl.offsetWidth; // сброс рефлоу
+      void pEl.offsetWidth;
       pEl.classList.add('intro-timer-running');
     }
     return;
   }
 
-  // 3. ПОДИУМ И ЗАЛ СЛАВЫ (ЧИСТАЯ, КРАСИВАЯ ТАБЛИЦА)
+  // 3. ПОДИУМ И ЗАЛ СЛАВЫ
   if (gameState.roundStage === 'podium' || gameState.gameOver) {
     vPodium?.classList.remove('hidden');
     const sorted = [...gameState.players].sort((a,b) => b.score - a.score);
@@ -323,6 +325,8 @@ function renderGameUI() {
         turnEl.innerText = "ГОЛОСУЕТ ВСЯ КОМАНДА! 🤝";
       } else if (roundData.type === 'auction' && gameState.rt?.stage === 'bidding') {
         turnEl.innerText = "ТОРГИ: СТАВКИ ДЕЛАЮТ ВСЕ! 🔨";
+      } else if (roundData.type === 'veto') {
+        turnEl.innerText = "СУПЕР-ФИНАЛ: ВА-БАНК! 🃏";
       } else {
         turnEl.innerText = isMyTurn ? "ВАШ ХОД! 🎯" : `ХОД: ${activeP ? activeP.name : 'Игрок'} 👀`;
       }
@@ -330,7 +334,6 @@ function renderGameUI() {
 
     document.getElementById('round-theme-badge').innerText = roundData.theme || '';
     
-    // ТЕКСТ ВОПРОСА (С ПОЛНОЙ ПОДДЕРЖКОЙ ВЕТО, СНЕЖНОГО КОМА И РИСКА)
     let qText = '';
     let currentOptions = roundData.a || [];
 
@@ -342,7 +345,7 @@ function renderGameUI() {
         qText = `ТЕМА: «${finalTopicName.toUpperCase()}». ДЕЛАЙТЕ ВАШИ СТАВКИ НА ВА-БАНК!`;
       } else if (gameState.rt?.phase === 'answering') {
         const cat = roundData.categories[gameState.rt.finalCatIdx];
-        qText = cat ? cat.q : 'ФИНАЛЬНЫЙ ВОПРОС';
+        qText = cat ? cat.q : 'ФИНАЛЬНЫЙ ВОПРОС:';
         currentOptions = cat ? cat.a : [];
       }
     } else if (roundData.type === 'blind') {
@@ -367,7 +370,7 @@ function renderGameUI() {
     const box = document.getElementById('answers-container');
     if (!box) return;
 
-    // А. ВЫБОР РИСКА: СУНДУКИ
+    // А. ВЫБОР РИСКА
     if (roundData.type === 'blind' && gameState.rt?.blindPhase === 'pick_chest') {
       box.className = "grid grid-cols-3 gap-3 pt-2";
       const chestsMeta = [
@@ -388,7 +391,7 @@ function renderGameUI() {
       return;
     }
 
-    // Б. СНЕЖНЫЙ КОМ: ВЫБОР РЕШЕНИЯ
+    // Б. СНЕЖНЫЙ КОМ
     if (roundData.type === 'snowball' && gameState.rt?.awaitingDecision && isMyTurn) {
       box.className = "flex gap-3 pt-2";
       box.innerHTML = `
@@ -432,7 +435,7 @@ function renderGameUI() {
       return;
     }
 
-    // Д. МИННОЕ ПОЛЕ (С 3D FLIP И СОТРЯСЕНИЕМ ЭКРАНА)
+    // Д. МИННОЕ ПОЛЕ
     if (roundData.type === 'mine') {
       box.className = "grid grid-cols-3 gap-2.5 pt-2";
       const opts = roundData.a || [];
@@ -491,9 +494,9 @@ function renderGameUI() {
       return;
     }
 
-    // Ж. ФИНАЛ: ВЕТО И ВА-БАНК (КРАСИВАЯ СЕТКА КАРТОЧЕК ВМЕСТО КРИВЫХ КНОПОК)
+    // Ж. ФИНАЛ: ВЕТО И ВА-БАНК
     if (roundData.type === 'veto') {
-      // ФАЗА 1: ВЫЧЕРКИВАНИЕ ТЕМ
+      // 1. Вычеркивание тем
       if (gameState.rt?.phase === 'banning') {
         box.className = "grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2";
         box.innerHTML = (roundData.categories || []).map((cat, idx) => {
@@ -509,25 +512,37 @@ function renderGameUI() {
         return;
       }
 
-      // ФАЗА 2: СТАВКА НА ВА-БАНК
+      // 2. Ставка на ва-банк: ДЕЛАЮТ ВСЕ ИГРОКИ!
       if (gameState.rt?.phase === 'betting') {
         box.className = "max-w-md mx-auto pt-2";
         const myScore = (gameState.players.find(p => p.clientId === myClientId)?.score) || 1;
         const maxBet = Math.max(1, myScore);
-        box.innerHTML = `
-          <div class="bg-[#180315] p-5 rounded-3xl border-4 border-[#FDB813] text-center space-y-3 shadow-[6px_6px_0px_#300D21]">
-            <span class="text-xs font-black uppercase text-[#FDB813] block">ВАША СТАВКА НА ВА-БАНК (ДО ${maxBet} БАЛЛОВ):</span>
-            <input id="veto-bet-input" type="number" min="1" max="${maxBet}" value="${Math.min(2, maxBet)}" class="w-full p-3.5 border-4 border-[#300D21] rounded-2xl font-black text-center text-2xl bg-[#FAF6EE] text-[#300D21]">
-            <button onclick="sendAction({type:'VETO_SUBMIT_BET', bet:parseInt(document.getElementById('veto-bet-input').value,10)||1}); showToast('Ставка на финал принята!');" class="w-full bg-[#FDB813] hover:bg-[#ffe278] text-[#300D21] border-3 border-[#300D21] py-3 rounded-2xl font-black uppercase shadow-[3px_3px_0px_#300D21] text-xs">
-              Подтвердить ставку 🎲
-            </button>
-          </div>
-        `;
+        const myBetSubmitted = gameState.rt.bets && gameState.rt.bets[gameState.players.find(p => p.clientId === myClientId)?.id] !== undefined;
+
+        if (myBetSubmitted) {
+          box.innerHTML = `
+            <div class="bg-[#180315] p-6 rounded-3xl border-3 border-[#00F0FF] text-center space-y-2">
+              <span class="text-4xl block animate-bounce">🎲</span>
+              <span class="neon-font text-base text-[#00F0FF] block">СТАВКА ПРИНЯТА!</span>
+              <span class="text-xs text-white/60 block">Ждём ставки остальных игроков...</span>
+            </div>
+          `;
+        } else {
+          box.innerHTML = `
+            <div class="bg-[#180315] p-5 rounded-3xl border-4 border-[#FDB813] text-center space-y-3 shadow-[6px_6px_0px_#300D21]">
+              <span class="text-xs font-black uppercase text-[#FDB813] block">ВАША СТАВКА НА ВА-БАНК (ДО ${maxBet} БАЛЛОВ):</span>
+              <input id="veto-bet-input" type="number" min="1" max="${maxBet}" value="${Math.min(2, maxBet)}" class="w-full p-3.5 border-4 border-[#300D21] rounded-2xl font-black text-center text-2xl bg-[#FAF6EE] text-[#300D21]">
+              <button onclick="sendAction({type:'VETO_SUBMIT_BET', bet:parseInt(document.getElementById('veto-bet-input').value,10)||1});" class="w-full bg-[#FDB813] hover:bg-[#ffe278] text-[#300D21] border-3 border-[#300D21] py-3 rounded-2xl font-black uppercase shadow-[3px_3px_0px_#300D21] text-xs">
+                Подтвердить ставку 🎲
+              </button>
+            </div>
+          `;
+        }
         return;
       }
     }
 
-    // З. СТАНДАРТНЫЕ ВАРИАНТЫ
+    // З. СТАНДАРТНЫЕ ВАРИАНТЫ (В Т.Ч. КОМАНДА В СОЮЗЕ И ВСЕ В ФИНАЛЕ)
     if (gameState.showOptions && currentOptions.length) {
       box.className = "grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2";
       box.innerHTML = currentOptions.map((opt, idx) => {
@@ -564,7 +579,22 @@ function toggleOrderPick(idx) {
 function sendAnswer(idx) {
   playSound('click');
   gameState.hasAnsweredCurrent = true;
-  sendAction({ type: "SUBMIT_ANSWER", choice: idx });
+  const roundData = gameState.roundsData[gameState.currentRound - 1] || {};
+
+  // В Союзе отправляем командный голос
+  if (roundData.type === 'union') {
+    sendAction({ type: "SUBMIT_UNION_VOTE", choice: idx });
+    showToast("Ваш голос принят! Ждём остальных...");
+  } 
+  // В финале отправляем финальный ответ каждого игрока
+  else if (roundData.type === 'veto' && gameState.rt?.phase === 'answering') {
+    sendAction({ type: "VETO_SUBMIT_ANSWER", choice: idx });
+    showToast("Финальный ответ принят!");
+  } 
+  // Обычный ответ
+  else {
+    sendAction({ type: "SUBMIT_ANSWER", choice: idx });
+  }
 }
 
 function sendAction(msg) {
